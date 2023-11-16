@@ -128,6 +128,7 @@ function start!()
     diags = [E]
 
     filename = joinpath(Parameters.filepath, Parameters.filename)
+    if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
     if isfile(filename); rm(filename); end
     out = Output(prob, filename, (:sol, get_sol), (:E, MultiLayerQG.energies))
 
