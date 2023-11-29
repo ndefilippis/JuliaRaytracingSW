@@ -63,6 +63,7 @@ end
 
 function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, packetSpinUpDelay, packet_params)
     saveproblem(out)
+	savepackets!(out, packets);
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
     startwalltime = time()

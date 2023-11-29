@@ -85,12 +85,12 @@ end
 
 function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
     ics = Array{NamedTuple{(:q, :p), Tuple{Vector{Float64}, Vector{Float64}}}}(undef, Npackets);
-    for i=1:Npackets
+    Threads.@threads for i=1:Npackets
         ic = (q = wavepackets[i].x, p = wavepackets[i].k);
         problem = PODEProblem(dxdt, dkdt, tspan, dt, ic, parameters=params);
         integrator = GeometricIntegrator(problem, ImplicitMidpoint());
         sol = integrate(integrator);
-        wavepackets[i] = Wavepacket(sol.q[end], sol.q[end]);
+        wavepackets[i] = Wavepacket(sol.q[end], sol.p[end]);
     end
     return solutions;
 end

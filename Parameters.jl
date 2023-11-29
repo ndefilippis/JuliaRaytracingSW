@@ -4,8 +4,8 @@ module Parameters
 # Integrator parameters
 stepper = "FilteredRK4"
 dt = 1e-3
-nsteps = 2000
-nx = 64 # number of grid points
+nsteps = 50000
+nx = 384 # number of grid points
 
 # Domain parameters
 L = 2π                   # domain size
@@ -20,11 +20,11 @@ nv = 8
 v = 0. # small scale dissipation term
 
 U = zeros(nlayers)       # the imposed mean zonal flow in each layer
-U[1] =  0.1
-U[2] = -0.1
+U[1] =  4e-2
+U[2] = -4e-2
 
 # Initial condition parameters
-q0_amplitude = 1e-2 # Height of initial q
+q0_amplitude = 1e-2*abs(U[1]) # Height of initial q
 
 # Output parameters
 filepath = "."
@@ -33,8 +33,8 @@ nsubs = 50;
 npacketsubs = 10;
 
 # Wavepackets parameters
-packetSpinUpDelay = 2; # Timesteps until we start advecting wavepackets
-sqrtNpackets = 2; # Square root of the number of wavepackets;
+packetSpinUpDelay = 20000; # Timesteps until we start advecting wavepackets
+sqrtNpackets = 10; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
 Cg = g*H[1];
 alpha = 2.; # How close to f the initial wavepacket frequencies are
