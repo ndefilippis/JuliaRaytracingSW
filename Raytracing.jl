@@ -1,6 +1,6 @@
 module Raytracing
 using Interpolations;
-using GeometricIntegrators;
+using DifferentialEquations;
 
 struct Wavepacket
     x::Vector{Float64}
@@ -67,32 +67,38 @@ function group_velocity(k, params)
    return params.Cg^2*k/dispersion_relation(k, params); 
 end
 
-function hamiltonian(t, x, k, params)
+function hamiltonian(x, k, params, t)
    return params.u(x[1], x[2], t)*k[1] + params.v(x[1], x[2], t) * k[2] + dispersion_relation(k, params)
 end
 
 
-function dxdt(xdot, t, x, k, params)
+function dxdt(xdot, x, k, params, t)
     group_vel = group_velocity(k, params);
     xdot[1] = params.u(x[1], x[2], t) + group_vel[1];
     xdot[2] = params.v(x[1], x[2], t) + group_vel[2];
 end
 
-function dkdt(kdot, t, x, k, params);
+function dkdt(kdot, x, k, params, t);
     kdot[1] = -params.ux(x[1], x[2], t)*k[1] - params.vx(x[1], x[2], t)*k[2];
     kdot[2] = -params.uy(x[1], x[2], t)*k[1] - params.vy(x[1], x[2], t)*k[2];
 end
 
 function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
-    ics = Array{NamedTuple{(:q, :p), Tuple{Vector{Float64}, Vector{Float64}}}}(undef, Npackets);
-    Threads.@threads for i=1:Npackets
-        ic = (q = wavepackets[i].x, p = wavepackets[i].k);
-        problem = PODEProblem(dxdt, dkdt, tspan, dt, ic, parameters=params);
-        integrator = GeometricIntegrator(problem, ImplicitMidpoint());
-        sol = integrate(integrator);
-        wavepackets[i] = Wavepacket(sol.q[end], sol.p[end]);
+    ics = Array{Tuple{Vector{Float64}, Vector{Float64}}}(undef, Npackets);
+    for i=1:Npackets
+       ics[i] = (wavepackets[i].x, wavepackets[i].k);
     end
-    return solutions;
+    function prob_func(prob, i, repeat)
+        remake(prob, u0 = ics[i]);
+        return prob
+    end
+    problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1], ics[1][2], tspan, params);
+    ensemble_prob = EnsembleProblem(problem, prob_func = prob_func);
+    sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt)
+    for i=1:Npackets;
+        wavepackets[i] = Wavepacket(sim[i][end,1:2], sim[i][end,3:4]);
+    end
+    return wavepackets;
 end
 
 function solve!(velocity::Velocity, gradient::VelocityGradient, x, y, Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
