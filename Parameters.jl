@@ -4,8 +4,8 @@ module Parameters
 # Integrator parameters
 stepper = "FilteredRK4"
 dt = 1e-3
-nsteps = 50000
-nx = 384 # number of grid points
+nsteps = 10000
+nx = 128 # number of grid points
 
 # Domain parameters
 L = 2π                   # domain size
@@ -33,7 +33,7 @@ nsubs = 50;
 npacketsubs = 10;
 
 # Wavepackets parameters
-packetSpinUpDelay = 20000; # Timesteps until we start advecting wavepackets
+packetSpinUpDelay = 0; # Timesteps until we start advecting wavepackets
 sqrtNpackets = 10; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
 Cg = g*H[1];
