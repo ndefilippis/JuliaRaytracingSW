@@ -1,2 +1,4 @@
-*.ipnyb*
+*.ipynb*
 slurm*.out
+*.mp4
+*.jld2

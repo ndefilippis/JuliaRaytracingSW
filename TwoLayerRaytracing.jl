@@ -10,7 +10,7 @@ function set_initial_condition!(dev, grid, prob, amplitude, nlayers)
    q0  = amplitude * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
    q0h = prob.timestepper.filter .* rfft(q0, (1, 2))
    q0  = irfft(q0h, grid.nx, (1, 2))
-   MultiLayerQG.set_q!(prob, q0) 
+   MultiLayerQG.set_q!(prob, q0)
 end
 
 function generate_initial_wavepackets(L, k0, Npackets, sqrtNpackets)

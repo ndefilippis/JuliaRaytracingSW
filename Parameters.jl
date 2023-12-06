@@ -4,8 +4,8 @@ module Parameters
 # Integrator parameters
 stepper = "FilteredRK4"
 dt = 1e-3
-nsteps = 50000
-nx = 384 # number of grid points
+nsteps = 10000
+nx = 128 # number of grid points
 
 # Domain parameters
 L = 2π                   # domain size
