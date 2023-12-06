@@ -78,16 +78,19 @@ out = Output(prob, filename, (:sol, get_sol), (:u, get_u))
 
 Lx, Ly = grid.Lx, grid.Ly
 
+title_KE = Observable(@sprintf("μt = %.2f", μ * clock.t))
 q = Observable(Array(vars.q[:, :, 1]))
 KE = Observable(Point2f[(μ * E.t[1], E.data[1][1][1])])
+u = Observable(Array(vars.u[:,:,1]))
+v = Observable(Array(vars.v[:,:,1]))
 
-Egrid = Observable(Array(0.5 * (vars.u[:,:,1].^2 + vars.v[:,:,1].^2)));
-Eh = @lift rfft(Array($Egrid))                         # Fourier transform of energy density
-krEhrtuple = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
-kr = @lift $answer[1]
-Ehr = @lift vec(abs.($answer[2]))
+Egrid = @lift 0.5 * ($u.^2 + $v.^2);
+Eh = @lift rfft($Egrid)                        # Fourier transform of energy density
+krEhr = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
+kr = @lift $krEhr[1]
+Ehr = @lift vec(abs.($krEhr[2]))
 
-fig = Figure(size=(1000, 600))
+fig = Figure(size=(1800, 600))
 
 axis_kwargs = (xlabel = "x",
                ylabel = "y",
@@ -100,14 +103,16 @@ axKE = Axis(fig[1, 2],
             ylabel = "KE",
             title = title_KE,
             yscale = log10,
-            limits = ((-0.1, 2.6), (1e-9, 5)))
+            aspect = 1,
+            limits = ((-0.1, dt * μ * nsteps), (1e-9, 5)))
 axKEspec = Axis(fig[1, 3],
             xlabel = L"k_r",
             ylabel = L"\int |\hat{E}| k_r \mathrm{d}k_\theta",
             xscale = log10,
             yscale = log10,
             title = "Radial energy spectrum",
-            limits = ((0.3, 1e2), (1e0, 1e5)))
+            aspect = 1,
+            limits = ((1.0, 127.0), (1e-5, 1e-3)))
 
 
 heatmap!(axq, x, y, q; colormap = :balance)
@@ -129,7 +134,11 @@ record(fig, "debug.mp4", frames, framerate = 18) do j
     println(log)
     flush(stdout)
   end
+  KE[] = push!(KE[], Point2f(μ * E.t[E.i], E.data[E.i][1][1]))
   q[] = vars.q[:, :, 1]
+  u[] = vars.u[:,:,1]
+  v[] = vars.v[:,:,1]
+  title_KE[] = @sprintf("μ t = %.2f", μ * clock.t)
 
   stepforward!(prob, diags, nsubs)
   MultiLayerQG.updatevars!(prob)
