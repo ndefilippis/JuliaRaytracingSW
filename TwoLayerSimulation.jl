@@ -2,9 +2,9 @@ using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
 dev = CPU()
-n = 256
-stepper = "AB3"  # timestepper
- nsteps = 20000          # total number of time-steps
+n = 512
+stepper = "FilteredRK4"  # timestepper
+ nsteps = 250000          # total number of time-steps
  nsubs  = 50             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
 function compute_parameters(rd, intervortex_radius)
@@ -31,15 +31,15 @@ nlayers = 2              # number of layers
 f₀, g = 1.0, 1.0            # Coriolis parameter and gravitational constant
 H = [0.5, 0.5]           # the rest depths of each layer
 ρ = [1.0, ρ2]           # the density of each layer
-nν = 4;
-ν = (2/n/3)^(2*nν);
+nν = 0;
+ν = 0#(2*n/3)^(2*nν);
 
 U = zeros(nlayers)       # the imposed mean zonal flow in each layer
 U[1] =  1.0
 U[2] = -1.0
 
 dx = L/n;
-dt = 0.5 * dx/V         # timestep
+dt = 0.05 * dx/V         # timestep
 println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
@@ -50,8 +50,8 @@ x, y = grid.x, grid.y
 
 seed!(1234) # reset of the random number generator for reproducibility
 q₀  = 1e-2 * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
-#q₀h = prob.timestepper.filter .* rfft(q₀, (1, 2)) # apply rfft  only in dims=1, 2
-#q₀  = irfft(q₀h, grid.nx, (1, 2))                 # apply irfft only in dims=1, 2
+q₀h = prob.timestepper.filter .* rfft(q₀, (1, 2)) # apply rfft  only in dims=1, 2
+q₀  = irfft(q₀h, grid.nx, (1, 2))                 # apply irfft only in dims=1, 2
 
 MultiLayerQG.set_q!(prob, q₀)
 E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
@@ -112,7 +112,7 @@ axKEspec = Axis(fig[1, 3],
             yscale = log10,
             title = "Radial energy spectrum",
             aspect = 1,
-            limits = ((1.0, 127.0), (1e-5, 1e-3)))
+            limits = ((1.0, 255.0), (1e-5, 1e-3)))
 
 
 heatmap!(axq, x, y, q; colormap = :balance)
