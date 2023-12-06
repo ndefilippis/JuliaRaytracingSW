@@ -20,8 +20,8 @@ nv = 8
 v = 0. # small scale dissipation term
 
 U = zeros(nlayers)       # the imposed mean zonal flow in each layer
-U[1] =  4e-2
-U[2] = -4e-2
+U[1] =  1.0
+U[2] = -1.0
 
 # Initial condition parameters
 q0_amplitude = 1e-2*abs(U[1]) # Height of initial q
@@ -30,12 +30,13 @@ q0_amplitude = 1e-2*abs(U[1]) # Height of initial q
 filepath = "."
 filename = "2layer_test.jld2"
 nsubs = 50;
-npacketsubs = 10;
+npacketsubs = 5;
 
 # Wavepackets parameters
-packetSpinUpDelay = 20000; # Timesteps until we start advecting wavepackets
-sqrtNpackets = 10; # Square root of the number of wavepackets;
+packetSpinUpDelay = 10000; # Timesteps until we start advecting wavepackets
+sqrtNpackets = 15; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
+packetVelocityScale = 1e-2; # Factor to scale background velocity, related to the Froude number
 Cg = g*H[1];
 alpha = 2.; # How close to f the initial wavepacket frequencies are
 k0Amplitude = sqrt(alpha^2 - 1)*f/Cg

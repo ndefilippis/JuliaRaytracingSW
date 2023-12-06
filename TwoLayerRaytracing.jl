@@ -39,8 +39,8 @@ function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket})
     return nothing;
 end
 
-function get_velocity_info(prob, grid)
-    ψh = prob.vars.ψh;
+function get_velocity_info(prob, grid, params)
+    ψh = params.packetVelocityScale * prob.vars.ψh;
     k = grid.kr;
     l = grid.l;
     uh  = -1im*l.*ψh;
@@ -82,13 +82,13 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
             packet_steps = nsubs / npacketsubs
             for _=1:(nsubs / npacketsubs)
                 for _=1:npacketsubs
-                    old_v_info = get_velocity_info(prob, grid);
+                    old_v_info = get_velocity_info(prob, grid, packet_params);
                     old_t = clock.t;
 
                     stepforward!(prob, diags, 1);
                     MultiLayerQG.updatevars!(prob);
 
-                    new_v_info = get_velocity_info(prob, grid);
+                    new_v_info = get_velocity_info(prob, grid, packet_params);
                     new_t = clock.t;
 
                     stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
@@ -115,7 +115,7 @@ function start!()
     nx, Lx, dt, stepper = Parameters.nx, Parameters.L, Parameters.dt, Parameters.stepper;
     f₀, g, H, ρ, U, μ, β, ν, nν = Parameters.f, Parameters.g, Parameters.H, Parameters.rho, Parameters.U, Parameters.r, Parameters.beta, Parameters.v, Parameters.nv;
     nlayers, Npackets = Parameters.nlayers, Parameters.Npackets
-    nsteps, nsubs, npacketsubs, packetSpinUpDelay = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay
+    nsteps, nsubs, npacketsubs, packetSpinUpDelay, packetVelocityScale = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay, Parameters.packetVelocityScale
     
     dev = CPU();
 
@@ -136,6 +136,6 @@ function start!()
     set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
 
     packets = generate_initial_wavepackets(Lx, Parameters.k0Amplitude, Npackets, Parameters.sqrtNpackets);
-    packet_params = (f = f₀, Cg = Parameters.Cg, dt = Parameters.packet_dt, Npackets = Npackets);
+    packet_params = (f = f₀, Cg = Parameters.Cg, dt = Parameters.packet_dt, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, Parameters.packetSpinUpDelay, packet_params);
 end

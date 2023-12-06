@@ -17,7 +17,7 @@ mkdir -p $rundir
 cp RaytracingDriver.jl TwoLayerRaytracing.jl Raytracing.jl Parameters.jl $rundir
 cd $rundir
 
-cat Parameters.sbatch > run.log
+cat Parameters.jl > run.log
 ~/julia/my-julia -t $SLURM_CPUS_PER_TASK RaytracingDriver.jl > run.log
 
 exit
