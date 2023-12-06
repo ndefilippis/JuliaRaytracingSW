@@ -1,7 +1,7 @@
 using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
-dev = GPU()
+dev = CPU()
 n = 256
 stepper = "AB3"  # timestepper
  nsteps = 20000          # total number of time-steps
@@ -78,14 +78,15 @@ out = Output(prob, filename, (:sol, get_sol), (:u, get_u))
 
 Lx, Ly = grid.Lx, grid.Ly
 
+title_KE = Observable(@sprintf("μt = %.2f", μ * clock.t))
 q = Observable(Array(vars.q[:, :, 1]))
 KE = Observable(Point2f[(μ * E.t[1], E.data[1][1][1])])
 
 Egrid = Observable(Array(0.5 * (vars.u[:,:,1].^2 + vars.v[:,:,1].^2)));
 Eh = @lift rfft(Array($Egrid))                         # Fourier transform of energy density
-krEhrtuple = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
-kr = @lift $answer[1]
-Ehr = @lift vec(abs.($answer[2]))
+krEhr = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
+kr = @lift $krEhr[1]
+Ehr = @lift vec(abs.($krEhr[2]))
 
 fig = Figure(size=(1000, 600))
 
@@ -130,6 +131,8 @@ record(fig, "debug.mp4", frames, framerate = 18) do j
     flush(stdout)
   end
   q[] = vars.q[:, :, 1]
+  KE[] = push!(KE[], Point2f(μ * E.t[E.i], E.data[E.i][1][1]))
+  title_KE[] = @sprintf("μ t = %.2f", μ * clock.t)
 
   stepforward!(prob, diags, nsubs)
   MultiLayerQG.updatevars!(prob)
