@@ -1,7 +1,7 @@
 using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
-dev = GPU()
+dev = CPU()
 n = 256
 stepper = "AB3"  # timestepper
  nsteps = 20000          # total number of time-steps
