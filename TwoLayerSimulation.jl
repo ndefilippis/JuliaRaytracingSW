@@ -104,7 +104,7 @@ axKE = Axis(fig[1, 2],
             title = title_KE,
             yscale = log10,
             aspect = 1,
-            limits = ((-0.1, dt * μ * nsteps), (1e-9, 5)))
+            limits = ((-0.1, dt * μ * nsteps), (1e-9, 2e1)))
 axKEspec = Axis(fig[1, 3],
             xlabel = L"k_r",
             ylabel = L"\int |\hat{E}| k_r \mathrm{d}k_\theta",
@@ -112,7 +112,7 @@ axKEspec = Axis(fig[1, 3],
             yscale = log10,
             title = "Radial energy spectrum",
             aspect = 1,
-            limits = ((1.0, 127.0), (1e-5, 1e-3)))
+            limits = ((1.0, 127.0), (1e-5, 1e0)))
 
 
 heatmap!(axq, x, y, q; colormap = :balance)
