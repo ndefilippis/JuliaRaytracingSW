@@ -2,9 +2,9 @@ using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
 dev = CPU()
-n = 256
-stepper = "RK4"  # timestepper
- nsteps = 250000          # total number of time-steps
+n = 512
+stepper = "FilteredRK4"  # timestepper
+ nsteps = 500000          # total number of time-steps
  nsubs  = 50             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
 function compute_parameters(rd, intervortex_radius)
@@ -22,8 +22,8 @@ function compute_parameters(rd, intervortex_radius)
 end
 
 L = 2π                   # domain size
-rd = L/20
-intervortex_radius = L/5
+rd = L/24
+intervortex_radius = L/7.2
 μ, ρ2, V = compute_parameters(rd, intervortex_radius)            
 β = 0                    # the y-gradient of planetary PV
 
@@ -31,8 +31,8 @@ nlayers = 2              # number of layers
 f₀, g = 1.0, 1.0            # Coriolis parameter and gravitational constant
 H = [0.5, 0.5]           # the rest depths of each layer
 ρ = [1.0, ρ2]           # the density of each layer
-nν = 5;
-ν = (2/n)^(2*nν);
+nν = 1;
+ν = 0#(2/n)^(2*nν);
 
 U = zeros(nlayers)       # the imposed mean zonal flow in each layer
 U[1] =  1.0
@@ -50,8 +50,8 @@ x, y = grid.x, grid.y
 
 seed!(1234) # reset of the random number generator for reproducibility
 q₀  = 1e-2 * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
-#q₀h = prob.timestepper.filter .* rfft(q₀, (1, 2)) # apply rfft  only in dims=1, 2
-#q₀  = irfft(q₀h, grid.nx, (1, 2))                 # apply irfft only in dims=1, 2
+q₀h = prob.timestepper.filter .* rfft(q₀, (1, 2)) # apply rfft  only in dims=1, 2
+q₀  = irfft(q₀h, grid.nx, (1, 2))                 # apply irfft only in dims=1, 2
 
 MultiLayerQG.set_q!(prob, q₀)
 E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
@@ -104,7 +104,7 @@ axKE = Axis(fig[1, 2],
             title = title_KE,
             yscale = log10,
             aspect = 1,
-            limits = ((-0.1, dt * μ * nsteps), (1e-9, 2e1)))
+            limits = ((-0.1, dt * μ * nsteps), (1e-9, 1)))
 axKEspec = Axis(fig[1, 3],
             xlabel = L"k_r",
             ylabel = L"\int |\hat{E}| k_r \mathrm{d}k_\theta",
@@ -112,18 +112,19 @@ axKEspec = Axis(fig[1, 3],
             yscale = log10,
             title = "Radial energy spectrum",
             aspect = 1,
-            limits = ((1.0, n/2-1), (1e-5, 1e0)))
+            limits = ((1.0, n/2-1), (1e-5, 1)))
 
+@lift ylims!(axKE, 1e-9, max(1, maximum($KE).data[2]))
+@lift ylims!(axKEspec, 1e-5, max(1, maximum($Ehr)))
 
 heatmap!(axq, x, y, q; colormap = :balance)
 ke = lines!(axKE, KE; linewidth = 3)
 kespec = lines!(axKEspec, kr, Ehr; linewidth = 2)
-
 startwalltime = time()
 
 frames = 0:round(Int, nsteps / nsubs)
 
-record(fig, "debug.mp4", frames, framerate = 18) do j
+record(fig, "movie.mp4", frames, framerate = 18) do j
   if j % (1000 / nsubs) == 0
     cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
     u_max = maximum([maximum(abs.(vars.u)), maximum(abs.(vars.v))])
