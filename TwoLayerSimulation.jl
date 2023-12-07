@@ -2,9 +2,9 @@ using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
 dev = CPU()
-n = 512
+n = 256
 stepper = "FilteredRK4"  # timestepper
- nsteps = 500000          # total number of time-steps
+ nsteps = 50000          # total number of time-steps
  nsubs  = 50             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
 function compute_parameters(rd, intervortex_radius)
@@ -39,12 +39,12 @@ U[1] =  1.0
 U[2] = -1.0
 
 dx = L/n;
-dt = 0.05 * dx/V         # timestep
+dt = 0.1 * dx/V         # timestep
 println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
 prob = MultiLayerQG.Problem(nlayers, dev; nx=n, Lx=L, f₀, g, H, ρ, U, μ, β, nν, ν,
-                            dt, stepper, aliased_fraction=1/3)
+                            dt, stepper, aliased_fraction=0)
 sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 x, y = grid.x, grid.y
 
