@@ -2,9 +2,9 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=36
+#SBATCH --cpus-per-task=24
 #SBATCH --mem=10GB
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --job-name=twolayer_simulation
 
 module purge
