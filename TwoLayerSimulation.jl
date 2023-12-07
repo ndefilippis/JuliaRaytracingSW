@@ -60,19 +60,7 @@ filename = joinpath(filepath, "2layer.jld2")
 if isfile(filename); rm(filename); end
 
 get_sol(prob) = prob.sol # extracts the Fourier-transformed solution
-
-function get_u(prob)
-  sol, params, vars, grid = prob.sol, prob.params, prob.vars, prob.grid
-
-  @. vars.qh = sol
-  streamfunctionfrompv!(vars.ψh, vars.qh, params, grid)
-  @. vars.uh = -im * grid.l * vars.ψh
-  invtransform!(vars.u, vars.uh, params)
-
-  return vars.u
-end
-
-out = Output(prob, filename, (:sol, get_sol), (:u, get_u))
+out = Output(prob, filename, (:sol, get_sol), (:E, MultiLayerQG.energies))
 
 Lx, Ly = grid.Lx, grid.Ly
 
