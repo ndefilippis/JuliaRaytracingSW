@@ -22,8 +22,8 @@ function compute_parameters(rd, intervortex_radius)
 end
 
 L = 2π                   # domain size
-rd = L/24
-intervortex_radius = L/7.2
+rd = 1/20
+intervortex_radius = 1/5
 μ, ρ2, V = compute_parameters(rd, intervortex_radius)            
 β = 0                    # the y-gradient of planetary PV
 
@@ -31,8 +31,6 @@ nlayers = 2              # number of layers
 f₀, g = 1.0, 1.0            # Coriolis parameter and gravitational constant
 H = [0.5, 0.5]           # the rest depths of each layer
 ρ = [1.0, ρ2]           # the density of each layer
-nν = 1;
-ν = 0#(2/n)^(2*nν);
 
 U = zeros(nlayers)       # the imposed mean zonal flow in each layer
 U[1] =  1.0
@@ -43,8 +41,8 @@ dt = 0.05 * dx/V         # timestep
 println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
-prob = MultiLayerQG.Problem(nlayers, dev; nx=n, Lx=L, f₀, g, H, ρ, U, μ, β, nν, ν,
-                            dt, stepper, aliased_fraction=1/3)
+prob = MultiLayerQG.Problem(nlayers, dev; nx=n, Lx=L, f₀, g, H, ρ, U, μ, β,
+                            dt, stepper, aliased_fraction=0)
 sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 x, y = grid.x, grid.y
 
@@ -114,7 +112,7 @@ axKEspec = Axis(fig[1, 3],
             aspect = 1,
             limits = ((1.0, n/2-1), (1e-5, 1)))
 
-@lift ylims!(axKE, 1e-9, max(1, maximum($KE).data[2]))
+@lift ylims!(axKE, 1e-9, max(1, 2*maximum($KE).data[2]))
 @lift ylims!(axKEspec, 1e-5, max(1, maximum($Ehr)))
 
 heatmap!(axq, x, y, q; colormap = :balance)
@@ -124,6 +122,7 @@ startwalltime = time()
 
 frames = 0:round(Int, nsteps / nsubs)
 
+saveproblem(out)
 record(fig, "movie.mp4", frames, framerate = 18) do j
   if j % (1000 / nsubs) == 0
     cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
@@ -143,4 +142,5 @@ record(fig, "movie.mp4", frames, framerate = 18) do j
 
   stepforward!(prob, diags, nsubs)
   MultiLayerQG.updatevars!(prob)
+  saveoutput(out);
 end
