@@ -2,8 +2,8 @@ using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
 dev = CPU()
-n = 384
-stepper = "FilteredRK4"  # timestepper
+n = 512
+stepper = "FilteredETDRK4"  # timestepper
  nsteps = 100000          # total number of time-steps
  nsubs  = 50             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
