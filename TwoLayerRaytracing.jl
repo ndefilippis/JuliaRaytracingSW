@@ -109,7 +109,12 @@ function stepraysforward!(grid, packets, v_info_1, v_info_2, tspan, params)
     Raytracing.solve!(velocity1, velocity2, dvelocity1, dvelocity2, grid.x, grid.y, params.Npackets, packets, params.dt, tspan, params);
 end
 
-get_sol(prob) = prob.sol # extracts the Fourier-transformed solution
+get_streamfunc(prob) = prob.vars.ψh
+function modal_energy(prob)
+    Eh = prob.grid.Krsq.*abs2.(vars.ψh[:,:,1])
+    kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
+    return Ehr
+end
 
 function start!()
     nx, Lx, dt, stepper = Parameters.nx, Parameters.L, Parameters.dt, Parameters.stepper;
@@ -120,18 +125,20 @@ function start!()
     dev = CPU();
 
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β, ν, nν,
-                                dt, stepper, aliased_fraction=1/3)
+                                dt, stepper, aliased_fraction=0)
 
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
 
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
-    diags = [E]
+    radialE = Diagnostic(modal_energy, prob; nsteps)
+    diags = [E, radialE]
 
     filename = joinpath(Parameters.filepath, Parameters.filename)
     if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
     if isfile(filename); rm(filename); end
-    out = Output(prob, filename, (:sol, get_sol), (:E, MultiLayerQG.energies))
+    
+    out = Output(prob, filename, (:ψh, get_streamfunc))
 
     set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
 
