@@ -26,7 +26,7 @@ function generate_initial_wavepackets(L, k0, Npackets, sqrtNpackets)
     return wavepackets;
 end
 
-function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket})
+function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket}, velocity_info)
    groupname = "packets"
     jldopen(out.path, "a+") do path
         path["$groupname/t/$(out.prob.clock.step)"] = out.prob.clock.t
@@ -34,6 +34,7 @@ function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket})
             path["$groupname/x/$i/$(out.prob.clock.step)"] = packets[i].x;
             path["$groupname/k/$i/$(out.prob.clock.step)"] = packets[i].k;
         end
+        path["$groupname/rms_U/$(out.prob.clock.step)"] = get_rms_U(velocity_info)
     end
     
     return nothing;
@@ -61,6 +62,11 @@ function get_velocity_info(prob, grid, params)
     return (velocity, velocity_gradient);
 end
 
+function get_rms_U(velocity_info::Raytracing.Velocity)
+    nx, ny = size(velocity.u)
+    return sqrt(sum(velocity.u.^2 + velocity.v.^2)/nx/ny);
+end
+
 function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, packetSpinUpDelay, packet_params)
     saveproblem(out)
 	savepackets!(out, packets);
@@ -81,10 +87,9 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
         if clock.step >= packetSpinUpDelay
             packet_steps = nsubs / npacketsubs
             for _=1:(nsubs / npacketsubs)
+                old_v_info = get_velocity_info(prob, grid, packet_params);
+                old_t = clock.t
                 for _=1:npacketsubs
-                    old_v_info = get_velocity_info(prob, grid, packet_params);
-                    old_t = clock.t;
-
                     stepforward!(prob, diags, 1);
                     MultiLayerQG.updatevars!(prob);
 
@@ -92,8 +97,11 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
                     new_t = clock.t;
 
                     stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
+                    
+                    old_v_info = new_v_info;
+                    old_t = new_t;
                 end
-                savepackets!(out, packets);
+                savepackets!(out, packets, old_v_info); # Save with latest velocity information
             end
         else
             stepforward!(prob, diags, nsubs);
@@ -109,6 +117,25 @@ function stepraysforward!(grid, packets, v_info_1, v_info_2, tspan, params)
     Raytracing.solve!(velocity1, velocity2, dvelocity1, dvelocity2, grid.x, grid.y, params.Npackets, packets, params.dt, tspan, params);
 end
 
+function set_up_problem(filename, stepper)
+    L = 2π
+    jldopen(filename) do ic_file
+        ψh = ic_file["ic/ψh"]
+        @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
+        dt = ic_file["clock/dt"]
+        nlayers = 2
+        dev = CPU();
+        L = 2π
+        nx = size(ψh, 2)
+        U = U[1,1,:]
+        ρ = [ρ[1], ρ[2]]
+        prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β, dt, stepper, aliased_fraction=0)
+        pvfromstreamfunction!(prob.sol, ψh, prob.params, prob.grid)
+        MultiLayerQG.updatevars!(prob)
+        return nx, dt, prob
+    end
+end
+
 get_streamfunc(prob) = prob.vars.ψh
 function modal_energy(prob)
     Eh = prob.grid.Krsq.*abs2.(vars.ψh[:,:,1])
@@ -117,17 +144,13 @@ function modal_energy(prob)
 end
 
 function start!()
-    nx, Lx, dt, stepper = Parameters.nx, Parameters.L, Parameters.dt, Parameters.stepper;
-    f₀, g, H, ρ, U, μ, β, ν, nν = Parameters.f, Parameters.g, Parameters.H, Parameters.rho, Parameters.U, Parameters.r, Parameters.beta, Parameters.v, Parameters.nv;
-    nlayers, Npackets = Parameters.nlayers, Parameters.Npackets
+    Lx, stepper = Parameters.nx, Parameters.L, Parameters.dt, Parameters.stepper;
+    nx, dt, prob = set_up_problem(Parameters.initial_condition_file, stepper);
+    
     nsteps, nsubs, npacketsubs, packetSpinUpDelay, packetVelocityScale = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay, Parameters.packetVelocityScale
     
-    dev = CPU();
-
-    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β, ν, nν,
-                                dt, stepper, aliased_fraction=0)
-
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
+    f₀, g, H = params.f₀, Parameters.g, Parameters.H
     x, y = grid.x, grid.y
 
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
@@ -140,9 +163,12 @@ function start!()
     
     out = Output(prob, filename, (:ψh, get_streamfunc))
 
-    set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
-
+    # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
+    Npackets = Parameters.Npackets
+    Cg = g*H[1]
     packets = generate_initial_wavepackets(Lx, Parameters.k0Amplitude, Npackets, Parameters.sqrtNpackets);
-    packet_params = (f = f₀, Cg = Parameters.Cg, dt = Parameters.packet_dt, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
+    rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
+    packetVelocityScale = initialFroudeNumber * Cg / max_U
+    packet_params = (f = f₀, Cg = Cg, dt = dt / packet_steps_per_background_step, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, Parameters.packetSpinUpDelay, packet_params);
 end

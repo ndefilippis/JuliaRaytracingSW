@@ -4,14 +4,13 @@ module Parameters
 # Integrator parameters
 stepper = "FilteredETDRK4"
 nsteps = 100000
-nx = 256 # number of grid points
+nx = 512 # number of grid points
 
 # Domain parameters
 L = 2π                   # domain size
 rd = 1/20
 intervortex_radius = 1/5
 
-r = 5e-2                 # bottom drag
 beta = 0                    # the y-gradient of planetary PV
 
 nlayers = 2              # number of layers
@@ -37,15 +36,17 @@ filename = "2layer_test.jld2"
 nsubs = 50;
 npacketsubs = 5;
 
+initial_condition_file = "initial_condition.jld2"
+
 # Wavepackets parameters
-packetSpinUpDelay = 30000; # Timesteps until we start advecting wavepackets
+packetSpinUpDelay = 0; # Timesteps until we start advecting wavepackets
 sqrtNpackets = 15; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
-packetVelocityScale = 1e-2; # Factor to scale background velocity, related to the Froude number
-Cg = g*H[1];
+initialFroudeNumber = 1e-1; # Scale initial steady background field to achieve this Froude number
+# Cg = g*H[1];
 alpha = 2.; # How close to f the initial wavepacket frequencies are
 k0Amplitude = sqrt(alpha^2 - 1)*f/Cg
-packet_dt = dt * 0.1;
+packetStepsPerBackgroundStep = 10
 
 function compute_parameters(rd, intervortex_radius, U, H, ρ1)
     c₁ = 3.2
