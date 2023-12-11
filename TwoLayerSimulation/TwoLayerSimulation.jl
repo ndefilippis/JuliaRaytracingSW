@@ -37,7 +37,7 @@ U[1] =  1.0
 U[2] = -1.0
 
 dx = L/n;
-dt = 0.1 * dx/V         # timestep
+dt = 0.05 * dx/V         # timestep
 println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
@@ -78,7 +78,7 @@ q = Observable(Array(vars.q[:, :, 1]))
 KE = Observable(Point2f[(μ * E.t[1], E.data[1][1][1])])
 ψh = Observable(Array(vars.ψh[:,:,1]))
 
-Eh = @lift prob.grid.Krsq.*abs2.(ψh) # Fourier transform of energy density
+Eh = @lift prob.grid.Krsq.*abs2.($ψh) # Fourier transform of energy density
 krEhr = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
 kr = @lift $krEhr[1]
 Ehr = @lift vec(abs.($krEhr[2])) .+ 1e-9

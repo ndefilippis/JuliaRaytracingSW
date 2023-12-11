@@ -26,7 +26,7 @@ rho = [1.0, undef]           # the density of each layer
 nv = 8
 v = 0. # small scale dissipation term
 
-dt = 0.1 * L/V/n
+dt = 0.05 * L/V/n
 
 # Initial condition parameters
 q0_amplitude = 1e-2*abs(U[1]) # Height of initial q
@@ -45,7 +45,7 @@ packetVelocityScale = 1e-2; # Factor to scale background velocity, related to th
 Cg = g*H[1];
 alpha = 2.; # How close to f the initial wavepacket frequencies are
 k0Amplitude = sqrt(alpha^2 - 1)*f/Cg
-packet_dt = 1e-4;
+packet_dt = dt * 0.1;
 
 function compute_parameters(rd, intervortex_radius, U, H, ρ1)
     c₁ = 3.2
