@@ -1,6 +1,7 @@
 using GeophysicalFlows, Printf;
 using Random: seed!;
 using JLD2;
+using UnPack;
 
 import .Parameters;
 import .Raytracing;
@@ -63,13 +64,14 @@ function get_velocity_info(prob, grid, params)
 end
 
 function get_rms_U(velocity_info::Raytracing.Velocity)
-    nx, ny = size(velocity.u)
-    return sqrt(sum(velocity.u.^2 + velocity.v.^2)/nx/ny);
+    nx, ny = size(velocity_info.u)
+    return sqrt(sum(velocity_info.u.^2 + velocity_info.v.^2)/nx/ny);
 end
 
 function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, packetSpinUpDelay, packet_params)
     saveproblem(out)
-	savepackets!(out, packets);
+    velocity_info, ~ = get_velocity_info(prob, grid, packet_params)
+	savepackets!(out, packets, velocity_info);
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
     startwalltime = time()
@@ -101,7 +103,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
                     old_v_info = new_v_info;
                     old_t = new_t;
                 end
-                savepackets!(out, packets, old_v_info); # Save with latest velocity information
+                savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
             end
         else
             stepforward!(prob, diags, nsubs);
@@ -138,20 +140,19 @@ end
 
 get_streamfunc(prob) = prob.vars.ψh
 function modal_energy(prob)
-    Eh = prob.grid.Krsq.*abs2.(vars.ψh[:,:,1])
+    Eh = prob.grid.Krsq.*abs2.(prob.vars.ψh[:,:,1])
     kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
     return Ehr
 end
 
 function start!()
-    Lx, stepper = Parameters.nx, Parameters.L, Parameters.dt, Parameters.stepper;
+    Lx, stepper = Parameters.L, Parameters.stepper;
     nx, dt, prob = set_up_problem(Parameters.initial_condition_file, stepper);
     
-    nsteps, nsubs, npacketsubs, packetSpinUpDelay, packetVelocityScale = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay, Parameters.packetVelocityScale
+    nsteps, nsubs, npacketsubs, packetSpinUpDelay = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay
     
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
-    f₀, g, H = params.f₀, Parameters.g, Parameters.H
-    x, y = grid.x, grid.y
+    f, g, H = params.f₀, params.g, params.H
 
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
     radialE = Diagnostic(modal_energy, prob; nsteps)
@@ -166,9 +167,10 @@ function start!()
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
     Cg = g*H[1]
-    packets = generate_initial_wavepackets(Lx, Parameters.k0Amplitude, Npackets, Parameters.sqrtNpackets);
+    
+    packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
-    packetVelocityScale = initialFroudeNumber * Cg / max_U
-    packet_params = (f = f₀, Cg = Cg, dt = dt / packet_steps_per_background_step, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
+    packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
+    packet_params = (f = f, Cg = Cg, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, Parameters.packetSpinUpDelay, packet_params);
 end
