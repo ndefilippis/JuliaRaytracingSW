@@ -84,19 +84,18 @@ function dkdt(kdot, x, k, params, t);
 end
 
 function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
-    ics = Array{Tuple{Vector{Float64}, Vector{Float64}}}(undef, Npackets);
+    ics = Vector(undef, Npackets);
     for i=1:Npackets
-       ics[i] = (wavepackets[i].x, wavepackets[i].k);
+       ics[i] = ArrayPartition(wavepackets[i].x, wavepackets[i].k);
     end
     function prob_func(prob, i, repeat)
         remake(prob, u0 = ics[i]);
-        return prob
     end
-    problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1], ics[1][2], tspan, params);
-    ensemble_prob = EnsembleProblem(problem, prob_func = prob_func);
-    sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false, safetycopy=false)
+    problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1:2], ics[1][3:4], tspan, params);
+    ensemble_prob = EnsembleProblem(problem, prob_func = prob_func, safetycopy=false);
+    sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
     for i=1:Npackets;
-        wavepackets[i] = Wavepacket(sim[i][1:2], sim[i][3:4]);
+        wavepackets[i] = Wavepacket(sim[i,1,1:2], sim[i,1,3:4]);
     end
     return wavepackets;
 end
