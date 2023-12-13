@@ -15,7 +15,7 @@ end
 
 # Integrator parameters
 stepper = "FilteredETDRK4"
-nsteps = 101#100000
+nsteps = 500000
 #nx = 512 # number of grid points
 
 # Domain parameters
@@ -44,15 +44,15 @@ L = 2π                   # domain size
 
 # Output parameters
 filepath = "."
-filename = "2layer_test.jld2"
+filename = "packets.jld2"
 nsubs = 50;
 npacketsubs = 5;
 
-initial_condition_file = "JuliaRaytracing/raytracing/initial_condition.jld2"
+initial_condition_file = "initial_condition.jld2"
 
 # Wavepackets parameters
 packetSpinUpDelay = 0; # Timesteps until we start advecting wavepackets
-sqrtNpackets = 1#15; # Square root of the number of wavepackets;
+sqrtNpackets = 15; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
 initialFroudeNumber = 1e-1; # Scale initial steady background field to achieve this Froude number
 # Cg = g*H[1];

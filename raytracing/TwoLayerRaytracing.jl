@@ -109,7 +109,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
             stepforward!(prob, diags, nsubs);
             MultiLayerQG.updatevars!(prob);
         end
-        saveoutput(out);
+        #saveoutput(out);
     end 
 end
 

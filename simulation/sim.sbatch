@@ -8,7 +8,6 @@
 #SBATCH --job-name=twolayer_simulation
 
 module purge
-module load julia/1.6.1
 
 export NUM_JULIA_THREADS=`nproc`
 
@@ -17,6 +16,6 @@ mkdir -p $rundir
 cp TwoLayerSimulation.jl $rundir
 cd $rundir
 
-my-julia -t $SLURM_CPUS_PER_TASK TwoLayerSimulation.jl > run.log
+~/julia-1.9.4/julia -t $SLURM_CPUS_PER_TASK TwoLayerSimulation.jl > run.log
 
 exit
