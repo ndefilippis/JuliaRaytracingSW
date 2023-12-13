@@ -70,7 +70,7 @@ end
 
 function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, packetSpinUpDelay, packet_params)
     saveproblem(out)
-    velocity_info, ~ = get_velocity_info(prob, grid, packet_params)
+    velocity_info, grad_v_info = get_velocity_info(prob, grid, packet_params)
 	savepackets!(out, packets, velocity_info);
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
 
@@ -85,6 +85,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
                        clock.step, clock.t, cfl, (time()-startwalltime)/60)
 
             println(log)
+            flush(stdout)
         end
         if clock.step >= packetSpinUpDelay
             packet_steps = nsubs / npacketsubs
