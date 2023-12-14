@@ -3,8 +3,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem-per-cpu=64GB
-#SBATCH --time=12:00:00
+#SBATCH --mem-per-cpu=8GB
+#SBATCH --time=48:00:00
 #SBATCH --job-name=twolayer_raytracing
 
 module purge
