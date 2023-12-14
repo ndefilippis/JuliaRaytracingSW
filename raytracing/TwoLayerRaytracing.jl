@@ -68,7 +68,7 @@ function get_rms_U(velocity_info::Raytracing.Velocity)
     return sqrt(sum(velocity_info.u.^2 + velocity_info.v.^2)/nx/ny);
 end
 
-function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, packetSpinUpDelay, packet_params)
+function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetSpinUpDelay, packet_params)
     saveproblem(out)
     velocity_info, grad_v_info = get_velocity_info(prob, grid, packet_params)
 	savepackets!(out, packets, velocity_info);
@@ -78,7 +78,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
     frames = 0:round(Int, nsteps / nsubs)
 
     for j=frames
-        if j % (1000 / nsubs) == 0
+        if j % (100 / nsubs) == 0
             cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
 
             log = @sprintf("step: %04d, t: %.1f, cfl: %.2f, walltime: %.2f min",
@@ -93,21 +93,22 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, 
                 old_v_info = get_velocity_info(prob, grid, packet_params);
                 old_t = clock.t
                 for _=1:npacketsubs
-                    stepforward!(prob, diags, 1);
+                    stepforward!(prob, [], 1);
                     MultiLayerQG.updatevars!(prob);
 
                     new_v_info = get_velocity_info(prob, grid, packet_params);
                     new_t = clock.t;
 
                     @time stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
-                    
                     old_v_info = new_v_info;
                     old_t = new_t;
                 end
-                savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
+				println("Saving packets")
+				flush(stdout)
+                @time savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
             end
         else
-            stepforward!(prob, diags, nsubs);
+            stepforward!(prob, [], nsubs);
             MultiLayerQG.updatevars!(prob);
         end
         #saveoutput(out);
@@ -155,9 +156,9 @@ function start!()
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     f, g, H = params.f₀, params.g, params.H
 
-    E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
-    radialE = Diagnostic(modal_energy, prob; nsteps)
-    diags = [E, radialE]
+    # E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
+    # radialE = Diagnostic(modal_energy, prob; nsteps)
+    # diags = [E, radialE]
 
     filename = joinpath(Parameters.filepath, Parameters.filename)
     if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
@@ -173,5 +174,5 @@ function start!()
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
     packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
     packet_params = (f = f, Cg = Cg, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
-    simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, diags, Parameters.packetSpinUpDelay, packet_params);
+    simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
 end
