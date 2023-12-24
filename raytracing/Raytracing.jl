@@ -96,7 +96,7 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
         remake(prob, u0 = ics[i]);
     end
 	#output_func(sol, i) = (sol[end], false)
-    println("Create problem:")
+    #println("Create problem:")
     #@time problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1:2], ics[1][3:4], tspan, params);
     #println("Create ensemble:")
     #@time ensemble_prob = EnsembleProblem(problem, prob_func = prob_func, output_func = output_func, safetycopy=false);
@@ -104,7 +104,7 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     #@time sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
     Threads.@threads for i=1:Npackets;
         problem = DynamicalODEProblem(dxdt, dkdt, ics[i][1:2], ics[i][3:4], tspan, params);
-        @time sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
+       sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
         wavepackets[i] = Wavepacket(sim[1:2,end], sim[3:4,end]);
     end
     return wavepackets;
