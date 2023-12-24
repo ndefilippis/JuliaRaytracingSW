@@ -27,7 +27,7 @@ function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket}, veloc
             path["$groupname/x/$i/$(out.prob.clock.step)"] = packets[i].x;
             path["$groupname/k/$i/$(out.prob.clock.step)"] = packets[i].k;
         end
-        path["$groupname/rms_U/$(out.prob.clock.step)"] = get_rms_U(velocity_info)
+        # path["$groupname/rms_U/$(out.prob.clock.step)"] = get_rms_U(velocity_info)
     end
     
     return nothing;
@@ -81,31 +81,24 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             println(log)
             flush(stdout)
         end
-        if clock.step >= packetSpinUpDelay
-            packet_steps = nsubs / npacketsubs
-            for _=1:(nsubs / npacketsubs)
-                old_v_info = get_velocity_info(prob, grid, packet_params);
-                old_t = clock.t
-                for _=1:npacketsubs
-                    stepforward!(prob, [], 1);
-                    MultiLayerQG.updatevars!(prob);
+        packet_steps = nsubs / npacketsubs
+        for _=1:(nsubs / npacketsubs)
+        	old_v_info = get_velocity_info(prob, grid, packet_params);
+            old_t = clock.t
+        
+		    for _=1:npacketsubs
+	            stepforward!(prob, [], 1);
+                MultiLayerQG.updatevars!(prob);
 
-                    new_v_info = get_velocity_info(prob, grid, packet_params);
-                    new_t = clock.t;
+                new_v_info = get_velocity_info(prob, grid, packet_params);
+                new_t = clock.t;
 
-                    @time stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
-                    old_v_info = new_v_info;
-                    old_t = new_t;
-                end
-				println("Saving packets")
-				flush(stdout)
-                @time savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
+                stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
+                old_v_info = new_v_info;
+                old_t = new_t;
             end
-        else
-            stepforward!(prob, [], nsubs);
-            MultiLayerQG.updatevars!(prob);
+            savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
         end
-        #saveoutput(out);
     end 
 end
 
@@ -117,29 +110,23 @@ end
 
 function set_up_problem(filename, stepper)
     L = 2π
-    jldopen(filename) do ic_file
-        ψh = ic_file["ic/ψh"]
-        @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
-        dt = ic_file["clock/dt"]
-        nlayers = 2
-        dev = CPU();
-        L = 2π
-        nx = size(ψh, 2)
-        U = U[1,1,:]
-        ρ = [ρ[1], ρ[2]]
-        prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β, dt, stepper, aliased_fraction=0)
-        pvfromstreamfunction!(prob.sol, ψh, prob.params, prob.grid)
-        MultiLayerQG.updatevars!(prob)
-        return nx, dt, prob
-    end
+    ic_file = jldopen(filename, "r")
+    ψh = ic_file["ic/ψh"]
+    @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
+    dt = ic_file["clock/dt"]
+    nlayers = 2
+    dev = CPU();
+    L = 2π
+    nx = size(ψh, 2)
+    U = U[1,1,:]
+    ρ = [ρ[1], ρ[2]]
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β, dt, stepper, aliased_fraction=0)
+    pvfromstreamfunction!(prob.sol, ψh, prob.params, prob.grid)
+    MultiLayerQG.updatevars!(prob)
+    close(ic_file)
+    return nx, dt, prob
 end
 
-get_streamfunc(prob) = prob.vars.ψh
-function modal_energy(prob)
-    Eh = prob.grid.Krsq.*abs2.(prob.vars.ψh[:,:,1])
-    kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
-    return Ehr
-end
 
 function start!()
     Lx, stepper = Parameters.L, Parameters.stepper;
@@ -150,15 +137,12 @@ function start!()
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     f, g, H = params.f₀, params.g, params.H
 
-    # E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
-    # radialE = Diagnostic(modal_energy, prob; nsteps)
-    # diags = [E, radialE]
 
     filename = joinpath(Parameters.filepath, Parameters.filename)
     if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
     if isfile(filename); rm(filename); end
     
-    out = Output(prob, filename, (:ψh, get_streamfunc))
+    out = Output(prob, filename)
 
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
