@@ -70,6 +70,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
 
     startwalltime = time()
     frames = 0:round(Int, nsteps / nsubs)
+	packet_frames = 0:round(Int, nsubs / npacketsubs)
 
     for j=frames
         if j % (100 / nsubs) == 0
@@ -81,24 +82,22 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             println(log)
             flush(stdout)
         end
-        packet_steps = nsubs / npacketsubs
-        for _=1:(nsubs / npacketsubs)
-        	old_v_info = get_velocity_info(prob, grid, packet_params);
-            old_t = clock.t
         
-		    for _=1:npacketsubs
-	            stepforward!(prob, [], 1);
-                MultiLayerQG.updatevars!(prob);
+		old_v_info = get_velocity_info(prob, grid, packet_params);
+        old_t = clock.t
+        
+		for k=packet_frames
+	        stepforward!(prob, [], nsubs);
+            MultiLayerQG.updatevars!(prob);
 
-                new_v_info = get_velocity_info(prob, grid, packet_params);
-                new_t = clock.t;
+            new_v_info = get_velocity_info(prob, grid, packet_params);
+            new_t = clock.t;
 
-                stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
-                old_v_info = new_v_info;
-                old_t = new_t;
-            end
-            savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
+            # stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
+            old_v_info = new_v_info;
+            old_t = new_t;
         end
+        savepackets!(out, packets, old_v_info[1]); # Save with latest velocity information
     end 
 end
 
