@@ -94,10 +94,14 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
 	output_func(sol, i) = (sol[end], false)
     problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1:2], ics[1][3:4], tspan, params);
     ensemble_prob = EnsembleProblem(problem, prob_func = prob_func, output_func = output_func, safetycopy=false);
-    sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
+    sim = solve(ensemble_prob, Tsit5(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
     for i=1:Npackets;
-        wavepackets[i] = Wavepacket(sim[1:2,i], sim[3:4,i]);
+        wavepackets[i].x[1] = sim[1,i]
+		wavepackets[i].x[2] = sim[2,i]
+		wavepackets[i].k[1] = sim[3,i]
+		wavepackets[i].k[2] = sim[4,i];
     end
+	sim = nothing;
     return wavepackets;
 end
 

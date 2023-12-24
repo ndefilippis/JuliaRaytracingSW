@@ -13,7 +13,7 @@ L = 2π                   # domain size
 # Output parameters
 filepath = "."
 filename = "packets.jld2"
-nsubs = 1000;
+nsubs = 1;
 npacketsubs = 50;
 
 initial_condition_file = "initial_condition.jld2"

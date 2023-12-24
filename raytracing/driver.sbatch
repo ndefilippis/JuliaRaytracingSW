@@ -2,8 +2,8 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=24
-#SBATCH --mem-per-cpu=4GB
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64GB
 #SBATCH --time=48:00:00
 #SBATCH --job-name=twolayer_raytracing
 
@@ -17,6 +17,6 @@ cp driver.sbatch Driver.jl TwoLayerRaytracing.jl Raytracing.jl Parameters.jl ini
 cd $rundir
 
 #~/julia-1.9.4/julia-writable -t $SLURM_CPUS_PER_TASK Driver.jl > run.log
- ~/julia-1.9.4/julia -t $SLURM_CPUS_PER_TASK Driver.jl > run.log
+julia -t $SLURM_CPUS_PER_TASK Driver.jl > run.log
 
 exit
