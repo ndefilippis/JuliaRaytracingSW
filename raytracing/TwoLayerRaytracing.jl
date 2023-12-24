@@ -6,14 +6,6 @@ using UnPack;
 import .Parameters;
 import .Raytracing;
 
-function set_initial_condition!(dev, grid, prob, amplitude, nlayers)
-   seed!(1234)
-   q0  = amplitude * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
-   q0h = prob.timestepper.filter .* rfft(q0, (1, 2))
-   q0  = irfft(q0h, grid.nx, (1, 2))
-   MultiLayerQG.set_q!(prob, q0)
-end
-
 function generate_initial_wavepackets(L, k0, Npackets, sqrtNpackets)
     wavepackets = Vector{Raytracing.Wavepacket}(undef, Npackets); 
     offset = L/sqrtNpackets/2;
@@ -28,7 +20,7 @@ function generate_initial_wavepackets(L, k0, Npackets, sqrtNpackets)
 end
 
 function savepackets!(out, packets::AbstractVector{Raytracing.Wavepacket}, velocity_info)
-   groupname = "packets"
+   groupname = "p"
     jldopen(out.path, "a+") do path
         path["$groupname/t/$(out.prob.clock.step)"] = out.prob.clock.t
         for i=1:size(packets, 1)
@@ -58,6 +50,8 @@ function get_velocity_info(prob, grid, params)
     uy = irfft(uyh, grid.nx, (1, 2));
     vx = irfft(vxh, grid.nx, (1, 2));
     vy = irfft(vyh, grid.nx, (1, 2));
+    
+    # put into barotropic mode
     velocity = Raytracing.Velocity(u[:,:,1], v[:,:,1]);
     velocity_gradient = Raytracing.VelocityGradient(ux[:,:,1], uy[:,:,1], vx[:,:,1], vy[:,:,1]);
     return (velocity, velocity_gradient);
