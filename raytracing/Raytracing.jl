@@ -104,16 +104,11 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     #@time sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
     Threads.@threads for i=1:Npackets;
         problem = DynamicalODEProblem(dxdt, dkdt, ics[i][1:2], ics[i][3:4], tspan, params);
-<<<<<<< HEAD
-       sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
-        wavepackets[i] = Wavepacket(sim[1:2,end], sim[3:4,end]);
-=======
-        @time sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
+        sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
         wavepackets[i].x[1] = sim[1,i];
 		wavepackets[i].x[2] = sim[2,i];
 		wavepackets[i].k[1] = sim[3,i];
 		wavepackets[i].k[2] = sim[4,i];
->>>>>>> ebfc2f359182f039458a002e4be8482c5b9726ba
     end
 	sim = nothing;
     return wavepackets;
