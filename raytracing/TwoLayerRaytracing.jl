@@ -93,7 +93,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             new_v_info = get_velocity_info(prob, grid, packet_params);
             new_t = clock.t;
 
-            # stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
+            stepraysforward!(grid, packets, old_v_info, new_v_info, (old_t, new_t), packet_params);
             old_v_info = new_v_info;
             old_t = new_t;
         end
