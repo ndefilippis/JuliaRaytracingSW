@@ -88,13 +88,13 @@ function dkdt(kdot, x, k, params, t);
 end
 
 function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
-    ics = Vector(undef, Npackets);
-    for i=1:Npackets
-       ics[i] = ArrayPartition(wavepackets[i].x, wavepackets[i].k);
-    end
-    function prob_func(prob, i, repeat)
-        remake(prob, u0 = ics[i]);
-    end
+    #ics = Vector(undef, Npackets);
+    #for i=1:Npackets
+    #    ics[i] = ArrayPartition(wavepackets[i].x, wavepackets[i].k);
+    #end
+    #function prob_func(prob, i, repeat)
+    #    remake(prob, u0 = ics[i]);
+    #end
 	#output_func(sol, i) = (sol[end], false)
     #println("Create problem:")
     #@time problem = DynamicalODEProblem(dxdt, dkdt, ics[1][1:2], ics[1][3:4], tspan, params);
@@ -103,12 +103,12 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     #println("Solve:")
     #@time sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
     Threads.@threads for i=1:Npackets;
-        problem = DynamicalODEProblem(dxdt, dkdt, ics[i][1:2], ics[i][3:4], tspan, params);
+        problem = DynamicalODEProblem(dxdt, dkdt, wavepackets[i].x, wavepackets[i].k, tspan, params);
         sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
-        wavepackets[i].x[1] = sim[1,i];
-		wavepackets[i].x[2] = sim[2,i];
-		wavepackets[i].k[1] = sim[3,i];
-		wavepackets[i].k[2] = sim[4,i];
+        wavepackets[i].x[1] = sim[1,1];
+		wavepackets[i].x[2] = sim[2,1];
+		wavepackets[i].k[1] = sim[3,1];
+		wavepackets[i].k[2] = sim[4,1];
     end
 	sim = nothing;
     return wavepackets;
