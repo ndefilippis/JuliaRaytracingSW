@@ -4,7 +4,7 @@ module Parameters
 
 # Integrator parameters
 stepper = "FilteredETDRK4"
-nsteps = 10000
+nsteps = 200000
 #nx = 512 # number of grid points
 
 # Domain parameters
@@ -20,9 +20,9 @@ initial_condition_file = "initial_condition.jld2"
 
 # Wavepackets parameters
 packetSpinUpDelay = 0; # Timesteps until we start advecting wavepackets
-sqrtNpackets = 10; # Square root of the number of wavepackets;
+sqrtNpackets = 15; # Square root of the number of wavepackets;
 Npackets = sqrtNpackets^2;
-initialFroudeNumber = 3e-1; # Scale initial steady background field to achieve this Froude number
+initialFroudeNumber = 2e-1; # Scale initial steady background field to achieve this Froude number
 corFactor = 2.; # How close to f the initial wavepacket frequencies are
-packetStepsPerBackgroundStep = 10
+packetStepsPerBackgroundStep = 25
 end
