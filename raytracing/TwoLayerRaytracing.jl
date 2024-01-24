@@ -64,6 +64,18 @@ end
 
 function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetSpinUpDelay, packet_params)
     saveproblem(out)
+    
+    # Set up memory constructs
+    u_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    v_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    ux_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    uy_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    vx_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    vy_background = Array{Float64}(undef, length(grid.x), length(grid.y))
+    
+    velocity_info = Raytracing.Velocity(u_background, v_background)
+    grad_v_info = Raytracing.VelocityGradient(ux_background, uy_background, vx_background, vy_background);
+    
     velocity_info, grad_v_info = get_velocity_info(prob, grid, packet_params)
 	savepackets!(out, packets, velocity_info);
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
