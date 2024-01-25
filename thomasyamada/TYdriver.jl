@@ -176,6 +176,7 @@ function start!()
             cfl = clock.dt * max_udx
             log = @sprintf("step %04d, t:%.1f, cfl: %.4f, walltime: %.2f min", clock.step, clock.t, cfl, (time()-startwalltime)/60)
             println(log)
+			flush(stdout)	
         end
         ζt[] = vars.ζt
         qc[] = vars.qc
