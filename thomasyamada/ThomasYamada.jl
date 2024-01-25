@@ -1,14 +1,16 @@
 module ThomasYamada
-
 export
   Problem,
   set_solution!,
   updatevars!,
 
   barotropic_energy,
-  baroclinic_energy
+  baroclinic_energy,
+  parsevalsum2
 
 using FourierFlows
+using FourierFlows: parsevalsum2
+
 using LinearAlgebra: mul!, ldiv!
 
 struct Params{T} <: AbstractParams
@@ -261,39 +263,56 @@ function Equation(params, grid)
     return FourierFlows.Equation(L, calcN!, grid)
 end
 
-function set_solution!(prob, ζ0, u0, v0, p0)
+function set_solution!(prob, ζ0h, u0h, v0h, p0h)
     vars, grid, sol = prob.vars, prob.grid, prob.sol
 
-    A = typeof(vars.ζt) # determine the type of vars.u
+    A = typeof(vars.ζth) # determine the type of vars.u
+    
+    #@. vars.ζth = A(ζ0h)
+    #@. vars.uch = A(u0h)
+    #@. vars.vch = A(v0h)
+    #@. vars.pch = A(p0h)
 
     # below, e.g., A(u0) converts u0 to the same type as vars expects
     # (useful when u0 is a CPU array but grid.device is GPU)
-    mul!(vars.ζth, grid.rfftplan, A(ζ0))
-    mul!(vars.uch, grid.rfftplan, A(u0))
-    mul!(vars.vch, grid.rfftplan, A(v0))
-    mul!(vars.pch, grid.rfftplan, A(p0))
+    # mul!(vars.ζth, grid.rfftplan, A(ζ0))
+    # mul!(vars.uch, grid.rfftplan, A(u0))
+    # mul!(vars.vch, grid.rfftplan, A(v0))
+    # mul!(vars.pch, grid.rfftplan, A(p0))
 
-    @. sol[:,:, 1] = vars.ζth
-    @. sol[:,:, 2] = vars.uch
-    @. sol[:,:, 3] = vars.vch
-    @. sol[:,:, 4] = vars.pch
+    sol[:,:, 1] = A(ζ0h)
+    sol[:,:, 2] = A(u0h)
+    sol[:,:, 3] = A(v0h)
+    sol[:,:, 4] = A(p0h)
 
     updatevars!(prob)
 
     return nothing
 end
 
+#function parsevalsum2(uh, grid)
+#  if size(uh, 1) == grid.nkr  # uh is in conjugate symmetric form
+#    Σ = sum(abs2, uh[1, :])                  # k = 0 modes
+#    Σ += sum(abs2, uh[grid.nkr, :])          # k = nx/2 modes
+#    Σ += 2 * sum(abs2, uh[2:grid.nkr-1, :])  # sum twice for 0 < k < nx/2 modes
+#  else # count every mode once
+#    Σ = sum(abs2, uh)
+#  end
+#
+#  Σ *= grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2) # normalization for dft
+#
+#  return Σ
+#end
+
 function baroclinic_energy(prob)
-    ldiv!(prob.vars.uc, grid.rfftplan, prob.sol[:,:,2])
-    ldiv!(prob.vars.vc, grid.rfftplan, prob.sol[:,:,3])
-    ldiv!(prob.vars.pc, grid.rfftplan, prob.sol[:,:,4])
-    return sum(prob.vars.uc.^2 + prob.vars.vc.^2 + prob.vars.pc.^2) * prob.grid.dx * prob.grid.dy
+    uch = @views prob.sol[:,:,2]
+    vch = @views prob.sol[:,:,3]
+    pch = @views prob.sol[:,:,4]
+    return parsevalsum2(uch, prob.grid) + parsevalsum2(vch, prob.grid) + parsevalsum2(pch, prob.grid)
 end
 
 function barotropic_energy(prob)
-    ldiv!(prob.vars.ut, grid.rfftplan,  im * grid.l  .* grid.invKrsq .* prob.sol[:,:,1])
-    ldiv!(prob.vars.vt, grid.rfftplan, -im * grid.kr .* grid.invKrsq .* prob.sol[:,:,1])
-    return sum(prob.vars.ut.^2 + prob.vars.vt.^2) * prob.grid.dx * prob.grid.dy
+    ζth = @views prob.sol[:,:,1]
+    return parsevalsum2(sqrt.(prob.grid.invKrsq) .* ζth, prob.grid)
 end
-
 end

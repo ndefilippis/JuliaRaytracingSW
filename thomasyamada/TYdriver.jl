@@ -1,6 +1,11 @@
 module Driver
 
+include("ThomasYamada.jl")
+include("Parameters.jl")
+
 using FourierFlows
+using FourierFlows: parsevalsum2
+
 using Random: seed!
 using CairoMakie
 using Printf
@@ -8,32 +13,51 @@ using .ThomasYamada
 import .Parameters
 
 function compute_balanced_basis(grid)
-    Φ₀ = Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3)
+    Φ₀ = device_array(grid.device)(Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3))
     ω = @. sqrt(1 + grid.kr^2 + grid.l^2)
     @. Φ₀[:,:,1] =  im * grid.l  / ω
     @. Φ₀[:,:,2] = -im * grid.kr / ω
     @. Φ₀[:,:,3] = -1 / ω
-    @. Φ₀[1,1,:] = [0, 0, 1]
+    Φ₀[1,1,:] = device_array(grid.device)([0, 0, 1])
     
     return Φ₀
 end
 
 function compute_wave_bases(grid)
     ω = @. sqrt(1 + grid.kr^2 + grid.l^2)
-    Φ₊ = Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3)
-    Φ₋ = Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3)
+    Φ₊ = device_array(grid.device)(Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3))
+    Φ₋ = device_array(grid.device)(Array{Complex{Float64}, 3}(undef, grid.nkr, grid.nl, 3))
     
     @. Φ₊[:,:,1] = (ω*grid.kr + im * grid.l) * sqrt(grid.invKrsq/2)/ω
     @. Φ₊[:,:,2] = (ω*grid.l - im * grid.kr) * sqrt(grid.invKrsq/2)/ω
     @. Φ₊[:,:,3] = (ω^2 - 1) * sqrt(grid.invKrsq/2)/ω
-    @. Φ₊[1,1,:] = [im, 1, 0]/sqrt(2)
+    Φ₊[1,1,:] = device_array(grid.device)([im, 1, 0]/sqrt(2))
     
     @. Φ₋[:,:,1] = (-ω*grid.kr + im * grid.l) * sqrt(grid.invKrsq/2)/ω
     @. Φ₋[:,:,2] = (-ω*grid.l - im * grid.kr) * sqrt(grid.invKrsq/2)/ω
     @. Φ₋[:,:,3] = (ω^2 - 1) * sqrt(grid.invKrsq/2)/ω
-    @. Φ₋[1,1,:] = [im, -1, 0]/sqrt(2)
+    Φ₋[1,1,:] = device_array(grid.device)([im, -1, 0]/sqrt(2))
    
     return (Φ₊, Φ₋)
+end
+
+function decompose_balanced_wave(solution, grid)
+    Φ₀ = compute_balanced_basis(prob.grid)
+    baroclinic_components = solution[:,:,2:4]
+    Gh = sum(baroclinic_components .* conj(Φ₀), dims=3) .* Φ₀
+    Wh = baroclinic_components - Gh
+    return (G, W)
+end
+
+function kinetic_energy_spectrum(solution, grid)
+    Gh, Wh = decompose_balanced_wave(solution, grid)
+    KEth = solution[:,:,1].^2
+    KEgh = Gh[:,:,1].^2 + Gh[:,:,2].^2
+    KEwh = Wh[:,:,1].^2 + Wh[:,:,2].^2
+    KEtr = FourierFlows.radialspectrum(KEth, grid, refinement = 1)  
+    KEgr = FourierFlows.radialspectrum(KEgh, grid, refinement = 1)
+    KEwr = FourierFlows.radialspectrum(KEwh, grid, refinement = 1)
+    return (KEtr, KEgr, KEwr)
 end
 
 function set_initial_condition(prob; k0=0, Et=0.0, Eg=0.0, Ew=0.0)
@@ -43,70 +67,60 @@ function set_initial_condition(prob; k0=0, Et=0.0, Eg=0.0, Ew=0.0)
     
     filter = (grid.Krsq .<= k0^2)
     
-    θ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
-    ψth = @. exp(2*pi*im*θ)*filter
-    ut = irfft(-im * grid.l  .* ψth, grid.nx, (1, 2))
-    vt = irfft( im * grid.kr .* ψth, grid.nx, (1, 2))
-    btE = sum(ut.^2 + vt.^2) * grid.dx * grid.dy
-    @. ψth = ψth * sqrt(Et / btE)
-    ζ₀h = @. - grid.Krsq * ψth
-    ζ₀ = irfft(ζ₀h, grid.nx, (1, 2))
-    
+    θ  = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₀ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₊ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₋ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
+    ϕ  = @. exp(2*π*im*θ ) * filter
     ϕ₀ = @. exp(2*π*im*θ₀) * filter
     ϕ₊ = @. exp(2*π*im*θ₊) * filter
     ϕ₋ = @. exp(2*π*im*θ₋) * filter
-    ω = @. sqrt(1 + grid.Krsq)
     
-    ugh = @.  ϕ₀*im*grid.l/ω
-    vgh = @. -ϕ₀*im*grid.kr/ω
-    pgh = @. -ϕ₀/ω
-    ugh[1,1] = 0
-    vgh[1,1] = 0
-    pgh[1,1] = ϕ₀[1,1]
+    Φ₀ = compute_balanced_basis(grid)
+    Φ₊, Φ₋ = compute_wave_bases(grid)
     
-    factor = @. sqrt(grid.invKrsq/2)/ω
-    uwh = @. factor * ((ω*grid.kr + im*grid.l)  * ϕ₊ + (-ω*grid.kr + im*grid.l)  * ϕ₋)
-    vwh = @. factor * ((ω*grid.l  - im*grid.kr) * ϕ₊ + (-ω*grid.l  - im*grid.kr) * ϕ₋)
-    pwh = @. factor * (ω^2 - 1) * (ϕ₊ + ϕ₋)
-    uwh[1,1] = im/sqrt(2)*(ϕ₊[1,1] + ϕ₋[1,1])
-    vwh[1,1] =  1/sqrt(2)*(ϕ₊[1,1] - ϕ₋[1,1])
-    pwh[1,1] =  0
+    ψth = ϕ
     
-    ug = irfft(ugh, grid.nx, (1, 2))
-    vg = irfft(vgh, grid.nx, (1, 2))
-    pg = irfft(pgh, grid.nx, (1, 2))
+    ugh = Φ₀[:,:,1] .* ϕ₀
+    vgh = Φ₀[:,:,2] .* ϕ₀
+    pgh = Φ₀[:,:,3] .* ϕ₀
     
-    gE = sum(@. ug^2 + vg^2 + pg^2) * grid.dx * grid.dy
-    @. ug = ug * sqrt(Eg / gE)
-    @. vg = vg * sqrt(Eg / gE)
-    @. pg = pg * sqrt(Eg / gE)
+    uwh = Φ₊[:,:,1] .* ϕ₊ + Φ₋[:,:,1] .* ϕ₋
+    vwh = Φ₊[:,:,2] .* ϕ₊ + Φ₋[:,:,2] .* ϕ₋
+    pwh = Φ₊[:,:,3] .* ϕ₊ + Φ₋[:,:,3] .* ϕ₋
     
-    uw = irfft(uwh, grid.nx, (1, 2))
-    vw = irfft(vwh, grid.nx, (1, 2))
-    pw = irfft(pwh, grid.nx, (1, 2))
+    btE = parsevalsum2(sqrt.(grid.Krsq) .* ψth, grid)
     
-    wE = sum(@. uw^2 + vw^2 + pw^2) * grid.dx * grid.dy
-    @. uw = uw * sqrt(Ew / wE)
-    @. vw = vw * sqrt(Ew / wE)
-    @. pw = pw * sqrt(Ew / wE)
+    gE  = parsevalsum2(ugh, grid) + parsevalsum2(vgh, grid) + parsevalsum2(pgh, grid)
+    wE  = parsevalsum2(uwh, grid) + parsevalsum2(vwh, grid) + parsevalsum2(pwh, grid)
     
-    u₀ = uw + ug
-    v₀ = vw + vg
-    p₀ = pw + pg
+    @. ψth = ψth * sqrt(Et / btE)
     
-    set_solution!(prob, ζ₀, u₀, v₀, p₀)
+    
+    @. ugh = ugh * sqrt(Eg / gE)
+    @. vgh = vgh * sqrt(Eg / gE)
+    @. pgh = pgh * sqrt(Eg / gE)
+    
+    @. uwh = uwh * sqrt(Ew / wE)
+    @. vwh = vwh * sqrt(Ew / wE)
+    @. pwh = pwh * sqrt(Ew / wE)
+    
+    ζ₀h = @. - grid.Krsq * ψth
+    u₀h = uwh + ugh
+    v₀h = vwh + vgh
+    p₀h = pwh + pgh
+    
+    set_solution!(prob, ζ₀h, u₀h, v₀h, p₀h)
 end
 
 function start!()
     nsteps = Parameters.nsteps
     nsubs = Parameters.nsubs
-    sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
-    x, y = grid.x, grid.y
-    
+   
     dev = CPU()
+    if (Parameters.device == "GPU")
+       dev = GPU() 
+    end
     prob = Problem(dev; 
         nx = Parameters.nx,
         ν  = Parameters.ν,
@@ -114,6 +128,9 @@ function start!()
         Ro = Parameters.Ro,
         stepper = Parameters.stepper,
         dt = Parameters.dt)
+    
+    sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
+    x, y = grid.x, grid.y
 
     set_initial_condition(prob; k0=Parameters.k0, Et=Parameters.Et, Eg=Parameters.Eg, Ew=Parameters.Ew)
 
