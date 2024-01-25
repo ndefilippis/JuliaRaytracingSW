@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=36
-#SBATCH --mem=20GB
+#SBATCH --mem=24GB
 #SBATCH --time=12:00:00
 #SBATCH --job-name=thomasyamada_simulation
 
