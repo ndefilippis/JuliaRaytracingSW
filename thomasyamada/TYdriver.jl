@@ -145,6 +145,7 @@ function start!()
     btE = Diagnostic(barotropic_energy, prob; nsteps)
     diags = [bcE, btE]
 
+    
     ζt = Observable(Array(vars.ζt))
     qc = Observable(Array(vars.qc))
     baroclinic = Observable(Point2f[(bcE.t[1], bcE.data[1])])
@@ -164,12 +165,12 @@ function start!()
     bt = lines!(axE, barotropic, label="bt E"; linewidth = 3)
     axislegend(axE)
 
-
     startwalltime = time()
     frames = 0:round(Int, nsteps / nsubs)
 
     updatevars!(prob)
     saveproblem(out)
+  # for j=frames
     record(fig, "thomas_yamada.mp4", frames, framerate = 18) do j
         if j % (1000 / nsubs) == 0
             max_udx = maximum([maximum(vars.uc) / grid.dx, maximum(vars.vc) / grid.dy, maximum(vars.ut) / grid.dx, maximum(vars.vt) / grid.dy])
