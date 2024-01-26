@@ -6,13 +6,12 @@ module Parameters
     nν = 8
 
     # Time stepping parameters
-    device = "GPU"
     dt = 1e-2
     stepper = "ETDRK4"
 
     # Output parameters
-    nsteps = 100000
-    nsubs  = 50    # Number of timesteps before outputting
+    nsteps = 200000
+    nsubs  = 250    # Number of timesteps before outputting
     filename = "ty.jld2"
     
     # Initial condition parameters
