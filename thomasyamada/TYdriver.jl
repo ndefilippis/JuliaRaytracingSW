@@ -113,14 +113,14 @@ function set_initial_condition(prob; k0=0, Et=0.0, Eg=0.0, Ew=0.0)
     set_solution!(prob, ζ₀h, u₀h, v₀h, p₀h)
 end
 
-function create_figure(ζt, qc, sol, baroclinic, barotropic)
+function create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
     fig = Figure(size=(1200,400))
     axζ = Axis(fig[1,1][1,1]; title="ζ_T")
     axq = Axis(fig[1,2][1,1]; title="q_C")
-    axE = Axis(fig[1,3][1,1], xlabel="t", ylabel="bc E", limits=((0, nsteps * prob.clock.dt), (0, 10.)))
+    axE = Axis(fig[1,3][1,1], xlabel="t", ylabel="bc E", limits=((0, Parameters.nsteps * prob.clock.dt), (0, 10.)))
 
-    ζhm = heatmap!(axζ, x, y, ζt; colormap = :balance)
-    qhm = heatmap!(axq, x, y, qc; colormap = :balance)
+    ζhm = heatmap!(axζ, prob.grid.x, prob.grid.y, ζt; colormap = :balance)
+    qhm = heatmap!(axq, prob.grid.x, prob.grid.y, qc; colormap = :balance)
 
     Colorbar(fig[1,1][2, 1], ζhm, vertical=false, flipaxis = false)
     Colorbar(fig[1,2][2, 1], qhm, vertical=false, flipaxis = false)
@@ -136,8 +136,9 @@ function start!()
     nsubs = Parameters.nsubs
    
     dev = CPU()
-    if (Parameters.device == "GPU")
-       dev = GPU() 
+    if (ARGS[1] == "GPU")
+		println("Executing on the GPU...")
+        dev = GPU() 
     end
     prob = Problem(dev; 
         nx = Parameters.nx,
@@ -169,7 +170,7 @@ function start!()
     baroclinic = Observable(Point2f[(bcE.t[1], bcE.data[1])])
     barotropic = Observable(Point2f[(btE.t[1], btE.data[1])])
 
-    # fig = create_figure(ζt, qc, sol, baroclinic, barotropic)
+    fig = create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
 
     startwalltime = time()
     frames = 0:round(Int, nsteps / nsubs)
@@ -185,11 +186,11 @@ function start!()
             println(log)
 			flush(stdout)	
         end
-        #ζt[] = vars.ζt
-        #qc[] = vars.qc
-        #baroclinic[] = push!(baroclinic[], Point2f(bcE.t[bcE.i], bcE.data[bcE.i][1]))
-        #barotropic[] = push!(barotropic[], Point2f(btE.t[btE.i], btE.data[btE.i][1]))
-        #solution[] = sol
+        ζt[] = vars.ζt
+        qc[] = vars.qc
+        baroclinic[] = push!(baroclinic[], Point2f(bcE.t[bcE.i], bcE.data[bcE.i][1]))
+        barotropic[] = push!(barotropic[], Point2f(btE.t[btE.i], btE.data[btE.i][1]))
+        solution[] = sol
         stepforward!(prob, diags, nsubs)
         updatevars!(prob)
         saveoutput(out)

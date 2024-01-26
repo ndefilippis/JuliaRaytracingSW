@@ -13,9 +13,9 @@ export NUM_JULIA_THREADS=`nproc`
 
 rundir=$SCRATCH/thomasyamada_simulation/$SLURM_JOB_ID
 mkdir -p $rundir
-cp Parameters.jl ThomasYamada.jl TYdriver.jl $rundir
+cp driver.sbatch Parameters.jl ThomasYamada.jl TYdriver.jl $rundir
 cd $rundir
 
-julia -t $SLURM_CPUS_PER_TASK TYdriver.jl > run.log
+julia -t $SLURM_CPUS_PER_TASK TYdriver.jl CPU > run.log
 
 exit
