@@ -157,7 +157,7 @@ function start!()
     filename = joinpath(filepath, Parameters.filename)
     if isfile(filename); rm(filename); end
     
-    get_sol(prob) = prob.sol
+    get_sol(prob) = Array(prob.sol)
     out = Output(prob, filename, (:sol, get_sol))
     
     bcE = Diagnostic(baroclinic_energy, prob; nsteps)
@@ -177,6 +177,7 @@ function start!()
 
     updatevars!(prob)
     saveproblem(out)
+    saveoutput(out)
     for j=frames
         #record(fig, "thomas_yamada.mp4", frames, framerate = 18) do j
         if j % (1000 / nsubs) == 0
