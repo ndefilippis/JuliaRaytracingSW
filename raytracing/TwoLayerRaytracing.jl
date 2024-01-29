@@ -127,13 +127,13 @@ function set_up_problem(filename, stepper)
     @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
     dt = ic_file["clock/dt"]
     nlayers = 2
-    dev = CPU();
+    dev = GPU();
     L = 2π
     nx = size(ψh, 2)
     U = U[1,1,:]
     ρ = [ρ[1], ρ[2]]
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β, dt, stepper, aliased_fraction=0)
-    pvfromstreamfunction!(prob.sol, ψh, prob.params, prob.grid)
+    pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
     MultiLayerQG.updatevars!(prob)
     close(ic_file)
     return nx, dt, prob
@@ -158,8 +158,12 @@ function start!()
 
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
-    Cg = g*H[1]
+    Cg = sqrt(g*H[1])
     
+    # omega^2 = f^2 + gH*k^2
+    # alpha^2*f^2 = f^2 + Cg^2*k^2
+    # f^2(alpha^2 - 1)/gH = k^2
+    # k = f/Cg*sqrt(alpha^2 - 1)
     packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
     packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
