@@ -1,6 +1,7 @@
 module Raytracing
 using Interpolations;
 using DifferentialEquations;
+using NFFT
 
 struct Wavepacket
     x::Vector{Float64}
@@ -102,7 +103,7 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     #@time ensemble_prob = EnsembleProblem(problem, prob_func = prob_func, output_func = output_func, safetycopy=false);
     #println("Solve:")
     #@time sim = solve(ensemble_prob, ImplicitMidpoint(), EnsembleThreads(), trajectories=Npackets, dt=dt, save_on=false, save_start=false)
-    Threads.@threads for i=1:Npackets;
+    Threads.@threads for i=1:Npackets
         problem = DynamicalODEProblem(dxdt, dkdt, wavepackets[i].x, wavepackets[i].k, tspan, params);
         sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
         wavepackets[i].x[1] = sim[1,1];
@@ -110,7 +111,6 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
 		wavepackets[i].k[1] = sim[3,1];
 		wavepackets[i].k[2] = sim[4,1];
     end
-	sim = nothing;
     return wavepackets;
 end
 
