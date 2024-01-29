@@ -158,7 +158,7 @@ function start!()
 
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
-    Cg = g*H[1]
+    Cg = sqrt(g*H[1])
     
     packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)

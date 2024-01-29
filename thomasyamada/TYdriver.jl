@@ -164,13 +164,13 @@ function start!()
     btE = Diagnostic(barotropic_energy, prob; nsteps)
     diags = [bcE, btE]
 
-    ζt = Observable(Array(vars.ζt))
-    qc = Observable(Array(vars.qc))
-    solution = Observable(Array(sol))
-    baroclinic = Observable(Point2f[(bcE.t[1], bcE.data[1])])
-    barotropic = Observable(Point2f[(btE.t[1], btE.data[1])])
+    # ζt = Observable(Array(vars.ζt))
+    # qc = Observable(Array(vars.qc))
+    # solution = Observable(Array(sol))
+    # baroclinic = Observable(Point2f[(bcE.t[1], bcE.data[1])])
+    # barotropic = Observable(Point2f[(btE.t[1], btE.data[1])])
 
-    fig = create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
+    # fig = create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
 
     startwalltime = time()
     frames = 0:round(Int, nsteps / nsubs)
@@ -179,7 +179,7 @@ function start!()
     saveproblem(out)
     saveoutput(out)
     for j=frames
-        #record(fig, "thomas_yamada.mp4", frames, framerate = 18) do j
+    	# record(fig, "thomas_yamada.mp4", frames, framerate = 18) do j
         if j % (1000 / nsubs) == 0
             max_udx = maximum([maximum(vars.uc) / grid.dx, maximum(vars.vc) / grid.dy, maximum(vars.ut) / grid.dx, maximum(vars.vt) / grid.dy])
             cfl = clock.dt * max_udx
@@ -187,11 +187,11 @@ function start!()
             println(log)
 			flush(stdout)	
         end
-        ζt[] = vars.ζt
-        qc[] = vars.qc
-        baroclinic[] = push!(baroclinic[], Point2f(bcE.t[bcE.i], bcE.data[bcE.i][1]))
-        barotropic[] = push!(barotropic[], Point2f(btE.t[btE.i], btE.data[btE.i][1]))
-        solution[] = sol
+        # ζt[] = vars.ζt
+        # qc[] = vars.qc
+        # baroclinic[] = push!(baroclinic[], Point2f(bcE.t[bcE.i], bcE.data[bcE.i][1]))
+        # barotropic[] = push!(barotropic[], Point2f(btE.t[btE.i], btE.data[btE.i][1]))
+        # solution[] = sol
         stepforward!(prob, diags, nsubs)
         updatevars!(prob)
         saveoutput(out)

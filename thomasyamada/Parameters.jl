@@ -10,7 +10,7 @@ module Parameters
     stepper = "ETDRK4"
 
     # Output parameters
-    nsteps = 200000
+    nsteps = 100000
     nsubs  = 250    # Number of timesteps before outputting
     filename = "ty.jld2"
     
