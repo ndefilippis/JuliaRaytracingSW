@@ -72,8 +72,8 @@ function start!()
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
     diags = [E, radialE]
 
-    filepath = "."
-    filename = joinpath(filepath, "2layer.jld2")
+    filepath = Parameters.filepath
+    filename = joinpath(filepath, Parameters.output_filename)
     if isfile(filename); rm(filename); end
 
     get_sol(prob) = prob.sol # extracts the Fourier-transformed solution
@@ -147,4 +147,11 @@ function start!()
       MultiLayerQG.updatevars!(prob)
       saveoutput(out);
     end
+    
+    snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)
+    if isfile(snapshot_filename); rm(snapshot_filename); end
+    
+    snapshot_out = Output(prob, snapshot_filename, (:ψh, get_sol))
+    saveproblem(snapshot_out)
+    saveoutput(snapshot_out)
 end

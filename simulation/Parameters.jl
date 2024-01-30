@@ -1,6 +1,7 @@
 # Parameters for two layer flows using GeophysicalFlows.jl
-
 module Parameters
+using Printf
+
 # Integrator parameters
 stepper = "FilteredETDRK4"
 nsteps = 100000
@@ -21,7 +22,9 @@ v = 0. # small scale dissipation term
 q0_amplitude = 1e-2*avg_U # Height of initial q
 
 # Output parameters
-filepath = "."
-filename = "2layer_test.jld2"
 nsubs = 50;
+filepath = "."
+output_filename = "2layer_test.jld2"
+snapshot_filename = @sprintf("initial_condition_%dx%d_U=%.2f.jld2", nx, nx, avg_U)
+
 end
