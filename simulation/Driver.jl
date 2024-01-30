@@ -1,6 +1,4 @@
 include("Parameters.jl")
-include("TwoLayerSimultion.jl")
-
-using TwoLayerSimulation: start!
+include("TwoLayerSimulation.jl")
 
 start!()

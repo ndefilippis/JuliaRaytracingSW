@@ -127,7 +127,7 @@ function set_up_problem(filename, stepper)
     @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
     dt = ic_file["clock/dt"]
     nlayers = 2
-    dev = GPU();
+    dev = CPU();
     L = 2π
     nx = size(ψh, 2)
     U = U[1,1,:]

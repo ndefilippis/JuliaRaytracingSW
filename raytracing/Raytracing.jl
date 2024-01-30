@@ -1,7 +1,6 @@
 module Raytracing
 using Interpolations;
 using DifferentialEquations;
-using NFFT
 
 struct Wavepacket
     x::Vector{Float64}

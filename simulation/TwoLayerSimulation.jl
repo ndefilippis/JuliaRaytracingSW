@@ -1,7 +1,7 @@
 using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
 
-using Parameters
+import .Parameters
 
 function compute_parameters(rd, l, avg_U, H)
     c₁ = 3.2
@@ -12,13 +12,13 @@ function compute_parameters(rd, l, avg_U, H)
     
     μ = c₂*U/(rd*log(l_star/c₂)); # bottom drag
     ρ2 = 1 / (1 - 2*rd^2/H)*ρ1
-    V = U*intervortex_radius/rd*log(l/rd);
+    # V = U * l_star * log(l_star);
     
     return μ, ρ2, U
 end
 
 function modal_energy(prob)
-    Eh = prob.grid.Krsq.*abs2.(@views vars.ψh[:,:,1])
+    Eh = prob.grid.Krsq.*abs2.(@views prob.vars.ψh[:,:,1])
     kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
     return Ehr
 end
@@ -49,18 +49,18 @@ function start!()
     U[1] =  shear_strength
     U[2] = -shear_strength
 
-    dx = L/n;
-    dt = 0.1 * dx/avg_U         # timestep
+    dx = L/nx;
+    dt = 0.075 * dx/avg_U         # timestep
     println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
-    prob = MultiLayerQG.Problem(nlayers, dev; nx=n, Lx=L, f₀, g, H, ρ, U, μ, β,
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β,
                                 dt, stepper, aliased_fraction=1/3)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
 
     seed!(1234) # reset of the random number generator for reproducibility
-    q₀  = q0_amplitude * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
+    q₀  = Parameters.q0_amplitude * device_array(dev)(randn((grid.nx, grid.ny, nlayers)))
     q₀h = prob.timestepper.filter .* rfft(q₀, (1, 2)) # apply rfft  only in dims=1, 2
     q₀  = irfft(q₀h, grid.nx, (1, 2))                 # apply irfft only in dims=1, 2
 
@@ -86,11 +86,12 @@ function start!()
     q = Observable(Array(vars.q[:, :, 1]))
     KE = Observable(Point2f[(μ * E.t[1], E.data[1][1][1])])
     ψh = Observable(Array(vars.ψh[:,:,1]))
+    ψhGPU = Observable(vars.ψh[:,:,1])
 
-    Eh = @lift prob.grid.Krsq.*abs2.($ψh) # Fourier transform of energy density
+    Eh = @lift prob.grid.Krsq.*abs2.($ψhGPU) # Fourier transform of energy density
     krEhr = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
-    kr = @lift $krEhr[1]
-    Ehr = @lift vec(abs.($krEhr[2])) .+ 1e-9
+    kr = @lift Array($krEhr[1])
+    Ehr = @lift vec(abs.(Array($krEhr[2]))) .+ 1e-9
 
     fig = Figure(size=(1800, 600))
 
@@ -114,7 +115,7 @@ function start!()
                 yscale = log10,
                 title = "Radial energy spectrum",
                 aspect = 1,
-                limits = ((1.0, n/2-1), (1e-1, 1)))
+                limits = ((1.0, nx/2-1), (1e-1, 1)))
     @lift ylims!(axKE, 1e-9, max(1, 2*maximum($KE).data[2]))
     @lift ylims!(axKEspec, 1e-1, max(1, 2*maximum($Ehr)))
 

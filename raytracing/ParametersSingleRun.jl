@@ -14,7 +14,7 @@ L = 2π                   # domain size
 filepath = "."
 filename = "packets.jld2"
 nsubs = 1;
-npacketsubs = 1;
+npacketsubs = 50;
 
 initial_condition_file = "raytracing/initial_condition.jld2"
 
