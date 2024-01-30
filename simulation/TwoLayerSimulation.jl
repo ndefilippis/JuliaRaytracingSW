@@ -85,10 +85,9 @@ function start!()
     title_KE = Observable(@sprintf("μt = %.2f", μ * clock.t))
     q = Observable(Array(vars.q[:, :, 1]))
     KE = Observable(Point2f[(μ * E.t[1], E.data[1][1][1])])
-    ψh = Observable(Array(vars.ψh[:,:,1]))
-    ψhGPU = Observable(vars.ψh[:,:,1])
+    ψh = Observable(vars.ψh[:,:,1])
 
-    Eh = @lift prob.grid.Krsq.*abs2.($ψhGPU) # Fourier transform of energy density
+    Eh = @lift prob.grid.Krsq.*abs2.($ψh) # Fourier transform of energy density
     krEhr = @lift FourierFlows.radialspectrum($Eh, grid, refinement = 1)
     kr = @lift Array($krEhr[1])
     Ehr = @lift vec(abs.(Array($krEhr[2]))) .+ 1e-9
