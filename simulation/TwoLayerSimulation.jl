@@ -3,6 +3,24 @@ using Random: seed!
 
 import .Parameters
 
+<<<<<<< HEAD
+=======
+function compute_parameters(rd, l, avg_U, H)
+    c₁ = 3.2
+    c₂ = 0.36
+    l_star = l/rd
+    # U = avg_U/l_star/sqrt(log(l_star));
+	U = avg_U * rd / l
+    ρ1 = 1.;
+    
+    μ = 2 * c₂*U/(rd*log(l_star/c₂)); # bottom drag
+    ρ2 = 1 / (1 - 2*rd^2/H)*ρ1
+    # V = U * l_star * log(l_star);
+    
+    return μ, ρ2, U
+end
+
+>>>>>>> 9245865bc862a19e257e9f9aa27848e28b34dbb2
 function modal_energy(prob)
     Eh = prob.grid.Krsq.*abs2.(@views prob.vars.ψh[:,:,1])
     kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
@@ -31,9 +49,15 @@ function start!()
 
     U = Parameters.U       # the imposed mean zonal flow in each layer
 
+<<<<<<< HEAD
     dx = Lx/nx;
     dt = 0.075 * dx/avg_U         # timestep
     println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
+=======
+    dx = L/nx;
+    dt = Parameters.cfl_factor * dx/avg_U         # timestep
+    println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f, shear flow: %.4f", μ, dt, ρ2, shear_strength));
+>>>>>>> 9245865bc862a19e257e9f9aa27848e28b34dbb2
 
 
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β,

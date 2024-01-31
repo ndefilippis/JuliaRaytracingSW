@@ -4,7 +4,7 @@ module Parameters
 
 # Integrator parameters
 stepper = "FilteredETDRK4"
-nsteps = 5000
+nsteps = 500000
 #nx = 512 # number of grid points
 
 # Domain parameters

@@ -14,9 +14,9 @@ L = 2π                   # domain size
 filepath = "."
 filename = "packets.jld2"
 nsubs = 1;
-npacketsubs = 50;
+npacketsubs = 1;
 
-initial_condition_file = "raytracing/initial_condition.jld2"
+initial_condition_file = "initial_condition.jld2"
 
 # Wavepackets parameters
 packetSpinUpDelay = 0; # Timesteps until we start advecting wavepackets
