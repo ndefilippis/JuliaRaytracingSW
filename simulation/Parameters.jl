@@ -8,7 +8,7 @@ function compute_parameters(rd, l, avg_U, gH, f)
     l_star = l/rd
     ρ1 = 1.;
     
-    μ = 2*c₂*U/(rd*log(l_star/c₂)); # bottom drag
+    μ = 2*c₂*U/(rd*log(l_star/c₁)); # bottom drag
     ρ2 = 1 / (1 - 4* f^2 * rd^2/gH)*ρ1
     
     # U = avg_U/l_star/sqrt(log(l_star));
@@ -24,7 +24,7 @@ nsteps = 200000
 nx = 256 # number of grid points
 
 # Domain parameters
-L = 2π                   # domain size
+Lx = 2π                   # domain size
 
 f, g = 1., 1.             # Coriolis parameter and gravitational constant
 deformation_radius = 1/25

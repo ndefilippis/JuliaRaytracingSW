@@ -31,8 +31,8 @@ function start!()
 
     U = Parameters.U       # the imposed mean zonal flow in each layer
 
-    dx = L/nx;
-    dt = Parameters.cfl_factor * dx/avg_U         # timestep
+    dx = Lx/nx;
+    dt = Parameters.dt         # timestep
     println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f, shear flow: %.4f", μ, dt, ρ2, shear_strength));
 
 
