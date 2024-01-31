@@ -3,6 +3,18 @@ using Interpolations;
 using DifferentialEquations;
 using NFFT
 
+struct Velocity
+    u::Array{Float64, 2}
+    v::Array{Float64, 2}
+end
+
+struct VelocityGradient
+    ux::Array{Float64, 2}
+    uy::Array{Float64, 2}
+    vx::Array{Float64, 2}
+    vy::Array{Float64, 2}
+end
+
 function dispersion_relation(k, params)
     return sqrt(params.f^2 + params.Cg^2*(k[1]*k[1] + k[2]*k[2]));
 end
@@ -27,23 +39,19 @@ function dkdt(kdot, x, k, params, t);
 end
 
 function _solve!(Npackets::Int, packets::AbstractArray{Float64, 2}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
-    Threads.@threads for i=1:Npackets
-        problem = DynamicalODEProblem(dxdt, dkdt, packets[i, 1:2], packets[i, 3:4], tspan, params);
-        sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
-        packets[i, 1] = sim[1,1]
-        packets[i, 2] = sim[2,1]
-        packets[i, 3] = sim[3,1]
-        packets[i, 4] = sim[4,1]
-    end
+    xs = @views packets[:,1:2]
+    ks = @views packets[:,3:4]
+    problem = DynamicalODEProblem(dxdt, dkdt, xs, ks, tspan, params);
+    sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
+    packets[i, 1] = sim[1,1]
+    packets[i, 2] = sim[2,1]
+    packets[i, 3] = sim[3,1]
+    packets[i, 4] = sim[4,1]
     return wavepackets;
 end
 
 function solve!(psi1h, psi2h, grid,
     x::AbstractRange{Float64}, y::AbstractRange{Float64}, Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Float64, tspan::Tuple{Float64, Float64}, params)
-
-    velocityInterpolator = createVelocityInterpolator(velocity1, velocity2, x, y, tspan);
-    velocityGradientInterpolator = createVelocityGradientInterpolator(gradient1, gradient2, x, y, tspan);
-    
     uh1 = @. -im*grid.l  * psi1h
     uh2 = @. -im*grid.l  * psi2h
     vh1 = @.  im*grid.kr * psi1h

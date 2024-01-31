@@ -4,7 +4,7 @@ module Parameters
 
 # Integrator parameters
 stepper = "FilteredETDRK4"
-nsteps = 500
+nsteps = 5000
 #nx = 512 # number of grid points
 
 # Domain parameters
@@ -12,9 +12,9 @@ L = 2π                   # domain size
 
 # Output parameters
 filepath = "."
-filename = "packets.jld2"
+filename = "packets2.jld2"
 nsubs = 1;
-npacketsubs = 1;
+npacketsubs = 10;
 
 initial_condition_file = "initial_condition.jld2"
 

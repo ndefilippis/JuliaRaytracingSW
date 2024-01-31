@@ -33,20 +33,20 @@ function get_velocity_info(ψh, grid, params, v_info, grad_v_info, temp_field)
     k = grid.kr;
     l = grid.l;
     
-    @. temp_field = -params.packetVelocityScale*1im*l*ψh;
+    @. temp_field = -1im*l*ψh;
     ldiv!(v_info.u, grid.rfftplan, temp_field)
     
-    @. temp_field = params.packetVelocityScale*1im*k*ψh;
+    @. temp_field = 1im*k*ψh;
     ldiv!(v_info.v, grid.rfftplan, temp_field)
     
     
-    @. temp_field = params.packetVelocityScale*k*l*ψh;
+    @. temp_field = k*l*ψh;
     ldiv!(grad_v_info.ux, grid.rfftplan, temp_field)
     
-    @. temp_field = params.packetVelocityScale*l*l*ψh;
+    @. temp_field = l*l*ψh;
     ldiv!(grad_v_info.uy, grid.rfftplan, temp_field)
     
-    @. temp_field = -params.packetVelocityScale*k*k*ψh;
+    @. temp_field = -k*k*ψh;
     ldiv!(grad_v_info.vx, grid.rfftplan, temp_field)
     
     @. grad_v_info.vy = -grad_v_info.ux
@@ -109,7 +109,7 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             get_velocity_info(@views(prob.vars.ψh[:,:,1]), grid, packet_params, new_velocity, new_grad_v, temp_field);
             new_t = clock.t;
 
-            Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (old_t, new_t), packet_params);
+            Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (packet_params.packetVelocityScale * old_t, packet_params.packetVelocityScale * new_t), packet_params);
             # stepraysforward!(grid, packets, old_v, new_v, (old_t / packet_params.packetVelocityScale, new_t / packet_params.packetVelocityScale), packet_params);
             old_velocity = new_velocity;
             old_grad_v = new_grad_v;
@@ -170,7 +170,7 @@ function start!()
     packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
     packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
-    packet_params = (f = f, Cg = Cg, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
+    packet_params = (f = f, Cg = Cg / packetVelocityScale, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
-    jldclose(out)
+    close(out)
 end

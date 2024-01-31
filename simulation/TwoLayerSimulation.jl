@@ -3,20 +3,6 @@ using Random: seed!
 
 import .Parameters
 
-function compute_parameters(rd, l, avg_U, H)
-    c₁ = 3.2
-    c₂ = 0.36
-    l_star = l/rd
-    U = avg_U/l_star/sqrt(log(l_star));
-    ρ1 = 1.;
-    
-    μ = c₂*U/(rd*log(l_star/c₂)); # bottom drag
-    ρ2 = 1 / (1 - 2*rd^2/H)*ρ1
-    # V = U * l_star * log(l_star);
-    
-    return μ, ρ2, U
-end
-
 function modal_energy(prob)
     Eh = prob.grid.Krsq.*abs2.(@views prob.vars.ψh[:,:,1])
     kr, Ehr = FourierFlows.radialspectrum(Eh, prob.grid)
@@ -35,26 +21,22 @@ function start!()
     f₀, g = Parameters.f, Parameters.g            # Coriolis parameter and gravitational constant
     H = Parameters.H        # the rest depths of each layer
 
-    L = Parameters.L                 # domain size
+    Lx = Parameters.Lx                 # domain size
     rd = Parameters.deformation_radius
     intervortex_radius = Parameters.intervortex_radius
-    avg_U = Parameters.avg_U
-    μ, ρ2, shear_strength = compute_parameters(rd, intervortex_radius, avg_U, H[1]) 
 
     β = 0                    # the y-gradient of planetary PV
 
-    ρ = [1.0, ρ2]           # the density of each layer
+    ρ = Parameters.ρ          # the density of each layer
 
-    U = zeros(nlayers)       # the imposed mean zonal flow in each layer
-    U[1] =  shear_strength
-    U[2] = -shear_strength
+    U = Parameters.U       # the imposed mean zonal flow in each layer
 
-    dx = L/nx;
+    dx = Lx/nx;
     dt = 0.075 * dx/avg_U         # timestep
     println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
 
 
-    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β,
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β,
                                 dt, stepper, aliased_fraction=1/3)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
