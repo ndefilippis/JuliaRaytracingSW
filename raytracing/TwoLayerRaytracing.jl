@@ -172,5 +172,5 @@ function start!()
     packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
     packet_params = (f = f, Cg = Cg, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
-    jldclose(out)
+    close(out)
 end

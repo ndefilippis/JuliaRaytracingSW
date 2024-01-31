@@ -7,10 +7,11 @@ function compute_parameters(rd, l, avg_U, H)
     c₁ = 3.2
     c₂ = 0.36
     l_star = l/rd
-    U = avg_U/l_star/sqrt(log(l_star));
+    # U = avg_U/l_star/sqrt(log(l_star));
+	U = avg_U * rd / l
     ρ1 = 1.;
     
-    μ = c₂*U/(rd*log(l_star/c₂)); # bottom drag
+    μ = 2 * c₂*U/(rd*log(l_star/c₂)); # bottom drag
     ρ2 = 1 / (1 - 2*rd^2/H)*ρ1
     # V = U * l_star * log(l_star);
     
@@ -50,8 +51,8 @@ function start!()
     U[2] = -shear_strength
 
     dx = L/nx;
-    dt = 0.075 * dx/avg_U         # timestep
-    println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f", μ, dt, ρ2));
+    dt = Parameters.cfl_factor * dx/avg_U         # timestep
+    println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f, shear flow: %.4f", μ, dt, ρ2, shear_strength));
 
 
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β,
