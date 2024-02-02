@@ -33,7 +33,7 @@ q0_amplitude = 1e-3*U0 # Height of initial q
 # Integrator parameters
 Ti = Ld / U0
 tmax = 100 * Ti
-dt = 60 * 30.
+dt = 60 * 20.
 dtsnap = 60 * 60 * 24 * 5
 nsubs = Int(dtsnap / dt)
 nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs

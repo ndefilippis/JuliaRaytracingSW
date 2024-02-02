@@ -1,4 +1,5 @@
 using GeophysicalFlows, CairoMakie, Printf;
+using CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
 using Random: seed!
 
 import .Parameters
@@ -98,7 +99,7 @@ function start!()
     @lift ylims!(axKE, 1e-9, max(1, 2*maximum($KE).data[2]))
     @lift ylims!(axKEspec, 1e-1, max(1, 2*maximum($Ehr)))
 
-    heatmap!(axq, x, y, q; colormap = :balance)
+    contourf!(axq, x, y, q; colormap = :balance)
     ke = lines!(axKE, KE; linewidth = 3)
     kespec = lines!(axKEspec, kr, Ehr; linewidth = 2)
     startwalltime = time()
@@ -106,7 +107,7 @@ function start!()
     frames = 0:round(Int, nsteps / nsubs)
 
     # saveproblem(out)
-    record(fig, "movie.mp4", frames, framerate = 18) do j
+    CairoMakie.record(fig, "movie.mp4", frames, framerate = 18) do j
       if j % (1000 / nsubs) == 0
         cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
         u_max = maximum([maximum(abs.(vars.u)), maximum(abs.(vars.v))])
