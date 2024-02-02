@@ -8,6 +8,7 @@ nx = 256 # number of grid points
 # Domain parameters
 Ld = 15e3				  # deformation radius
 Lx = 25 * 2π * Ld         # domain size
+Lx += 1e-5		# Temporary fix to deal with issue with radialspectrum
 
 f, g = 1e-4, 9.81             # Coriolis parameter and gravitational constant
 H0 = 4000.
@@ -16,26 +17,26 @@ nv = 8
 v = 0. # small scale dissipation term
 cfl_factor = 0.05
 
-ρ1 = 1025.
-ρ2 = ρ1 / (1 - (4 * f^2 * Ld^2) / (g * H0))
+b2 = 1
+b1 = 4 * f^2 * Ld^2 / H0 + b2
 
 U0 = 0.01
 U = [2*U0, 0.]
-ρ = [ρ1, ρ2]
+b = [b1, b2]
 
 kappa_star = 0.1
 μ = 2 * U0 / Ld * kappa_star
 
 # Initial condition parameters
-q0_amplitude = 1e-2*U0 # Height of initial q
+q0_amplitude = 1e-3*U0 # Height of initial q
 
 # Integrator parameters
 Ti = Ld / U0
 tmax = 100 * Ti
-dt = 60 * 3.
+dt = 60 * 30.
 dtsnap = 60 * 60 * 24 * 5
 nsubs = Int(dtsnap / dt)
-nsteps = ceil(Int, ceil(Int, tmax / t) / nsubs) * nsubs
+nsteps = ceil(Int, ceil(Int, tmax / dt) / nsubs) * nsubs
 stepper = "FilteredRK4"
 
 # Output parameters

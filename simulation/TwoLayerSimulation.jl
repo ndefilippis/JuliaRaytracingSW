@@ -18,25 +18,23 @@ function start!()
     nsubs  = Parameters.nsubs             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
     nlayers = 2              # number of layers
-    f₀, g = Parameters.f, Parameters.g            # Coriolis parameter and gravitational constant
+    f₀, b = Parameters.f, Parameters.b            # Coriolis parameter and gravitational constant
     H = Parameters.H        # the rest depths of each layer
 
     Lx = Parameters.Lx                 # domain size
-    rd = Parameters.deformation_radius
-    intervortex_radius = Parameters.intervortex_radius
 
     β = 0                    # the y-gradient of planetary PV
 
-    ρ = Parameters.ρ          # the density of each layer
-
     U = Parameters.U       # the imposed mean zonal flow in each layer
+
+	μ = Parameters.μ		# bottom drag parameter
 
     dx = Lx/nx;
     dt = Parameters.dt         # timestep
-    println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f, shear flow: %.4f", μ, dt, ρ2, shear_strength));
+    println(@sprintf("bottom drag: %.5f, time step: %.4f, shear flow: %.4f", μ, dt, (U[1] - U[2])/2));
 
 
-    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β,
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, H, b, U, μ, β,
                                 dt, stepper, aliased_fraction=1/3)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
@@ -58,7 +56,7 @@ function start!()
     filename = joinpath(filepath, Parameters.output_filename)
     if isfile(filename); rm(filename); end
 
-    get_sol(prob) = prob.sol # extracts the Fourier-transformed solution
+    get_sol(prob) = Array(prob.sol) # extracts the Fourier-transformed solution
     get_streamfunc(prob) = prob.vars.ψh
     out = Output(prob, filename, (:ψh, get_streamfunc))
 
