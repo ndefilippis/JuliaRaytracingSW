@@ -58,7 +58,7 @@ function start!()
 
     get_sol(prob) = Array(prob.sol) # extracts the Fourier-transformed solution
     get_streamfunc(prob) = prob.vars.ψh
-    out = Output(prob, filename, (:ψh, get_streamfunc))
+    # out = Output(prob, filename, (:ψh, get_streamfunc))
 
     Lx, Ly = grid.Lx, grid.Ly
 
@@ -105,7 +105,7 @@ function start!()
 
     frames = 0:round(Int, nsteps / nsubs)
 
-    saveproblem(out)
+    # saveproblem(out)
     record(fig, "movie.mp4", frames, framerate = 18) do j
       if j % (1000 / nsubs) == 0
         cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
@@ -124,7 +124,7 @@ function start!()
 
       stepforward!(prob, diags, nsubs)
       MultiLayerQG.updatevars!(prob)
-      saveoutput(out);
+      # saveoutput(out);
     end
     
     snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)
