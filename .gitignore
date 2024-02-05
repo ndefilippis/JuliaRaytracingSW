@@ -2,5 +2,6 @@
 *.ipynb
 slurm*.out
 *.mp4
+*.pdf
 *.jld2
 images/
