@@ -1,4 +1,5 @@
 using GeophysicalFlows, CairoMakie, Printf;
+using CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
 using Random: seed!
 
 import .Parameters
@@ -18,25 +19,23 @@ function start!()
     nsubs  = Parameters.nsubs             # number of time-steps for plotting (nsteps must be multiple of nsubs)
 
     nlayers = 2              # number of layers
-    f₀, g = Parameters.f, Parameters.g            # Coriolis parameter and gravitational constant
+    f₀, b = Parameters.f, Parameters.b            # Coriolis parameter and gravitational constant
     H = Parameters.H        # the rest depths of each layer
 
     Lx = Parameters.Lx                 # domain size
-    rd = Parameters.deformation_radius
-    intervortex_radius = Parameters.intervortex_radius
 
     β = 0                    # the y-gradient of planetary PV
 
-    ρ = Parameters.ρ          # the density of each layer
-
     U = Parameters.U       # the imposed mean zonal flow in each layer
 
-    dx = L/nx;
-    dt = Parameters.cfl_factor * dx/avg_U         # timestep
-    println(@sprintf("bottom drag: %.5f, time step: %.4f, second density: %.4f, shear flow: %.4f", μ, dt, ρ2, shear_strength));
+	μ = Parameters.μ		# bottom drag parameter
+
+    dx = Lx/nx;
+    dt = Parameters.dt         # timestep
+    println(@sprintf("bottom drag: %.5f, time step: %.4f, shear flow: %.4f", μ, dt, (U[1] - U[2])/2));
 
 
-    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, g, H, ρ, U, μ, β,
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, H, b, U, μ, β,
                                 dt, stepper, aliased_fraction=1/3)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
@@ -58,9 +57,9 @@ function start!()
     filename = joinpath(filepath, Parameters.output_filename)
     if isfile(filename); rm(filename); end
 
-    get_sol(prob) = prob.sol # extracts the Fourier-transformed solution
+    get_sol(prob) = Array(prob.sol) # extracts the Fourier-transformed solution
     get_streamfunc(prob) = prob.vars.ψh
-    out = Output(prob, filename, (:ψh, get_streamfunc))
+    # out = Output(prob, filename, (:ψh, get_streamfunc))
 
     Lx, Ly = grid.Lx, grid.Ly
 
@@ -100,15 +99,15 @@ function start!()
     @lift ylims!(axKE, 1e-9, max(1, 2*maximum($KE).data[2]))
     @lift ylims!(axKEspec, 1e-1, max(1, 2*maximum($Ehr)))
 
-    heatmap!(axq, x, y, q; colormap = :balance)
+    contourf!(axq, x, y, q; colormap = :balance)
     ke = lines!(axKE, KE; linewidth = 3)
     kespec = lines!(axKEspec, kr, Ehr; linewidth = 2)
     startwalltime = time()
 
     frames = 0:round(Int, nsteps / nsubs)
 
-    saveproblem(out)
-    record(fig, "movie.mp4", frames, framerate = 18) do j
+    # saveproblem(out)
+    CairoMakie.record(fig, "movie.mp4", frames, framerate = 18) do j
       if j % (1000 / nsubs) == 0
         cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
         u_max = maximum([maximum(abs.(vars.u)), maximum(abs.(vars.v))])
@@ -126,7 +125,7 @@ function start!()
 
       stepforward!(prob, diags, nsubs)
       MultiLayerQG.updatevars!(prob)
-      saveoutput(out);
+      # saveoutput(out);
     end
     
     snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)

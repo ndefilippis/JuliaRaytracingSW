@@ -105,7 +105,7 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     Threads.@threads for i=1:Npackets
 	#for i=1:Npackets
         problem = DynamicalODEProblem(dxdt, dkdt, wavepackets[i].x, wavepackets[i].k, tspan, params);
-        sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
+        local sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
         wavepackets[i].x[1] = sim[1,1];
 		wavepackets[i].x[2] = sim[2,1];
 		wavepackets[i].k[1] = sim[3,1];
