@@ -100,14 +100,14 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             flush(stdout)
         end
         
-		get_velocity_info(@views get_sol(prob)[:,:,1]), grid, packet_params, old_velocity, old_grad_v, temp_field);
+		get_velocity_info(@views(get_sol(prob)[:,:,1]), grid, packet_params, old_velocity, old_grad_v, temp_field);
         old_t = clock.t
         
 		for k=packet_frames
 	        stepforward!(prob, [], nsubs);
             MultiLayerQG.updatevars!(prob);
 
-            get_velocity_info(@views( get_sol(prob)[:,:,1]), grid, packet_params, new_velocity, new_grad_v, temp_field);
+            get_velocity_info(@views(get_sol(prob)[:,:,1]), grid, packet_params, new_velocity, new_grad_v, temp_field);
             new_t = clock.t;
 
             Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (packet_params.packetVelocityScale * old_t, packet_params.packetVelocityScale * new_t), packet_params);
