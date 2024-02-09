@@ -1,14 +1,14 @@
 # Parameters for two layer raytracing simulation
 
 module Parameters
+using FourierFlows
 
 # Integrator parameters
-stepper = "FilteredETDRK4"
+stepper = "FilteredRK4"
 nsteps = 50000
-#nx = 512 # number of grid points
 
 # Device
-dev = CPU()
+dev = GPU()
 
 # Domain parameters
 L = 2π                   # domain size
@@ -17,7 +17,7 @@ L = 2π                   # domain size
 filepath = "."
 filename = "packets2.jld2"
 nsubs = 1;
-npacketsubs = 10;
+npacketsubs = 1;
 
 initial_condition_file = "initial_condition.jld2"
 

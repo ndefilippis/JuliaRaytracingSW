@@ -4,8 +4,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
-#SBATCH --mem=30GB
-#SBATCH --time=12:00:00
+#SBATCH --mem=32GB
+#SBATCH --time=48:00:00
 #SBATCH --job-name=2Lmatt
 
 module purge

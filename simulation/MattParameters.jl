@@ -3,7 +3,7 @@ module Parameters
 using Printf
 
 # Integrator parameters
-nx = 256 # number of grid points
+nx = 384 # number of grid points
 
 # Domain parameters
 Ld = 15e3				  # deformation radius

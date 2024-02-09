@@ -36,7 +36,7 @@ function start!()
 
 
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx, f₀, H, b, U, μ, β,
-                                dt, stepper, aliased_fraction=1/3)
+                                dt, stepper, aliased_fraction=0)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
 
@@ -73,6 +73,8 @@ function start!()
     kr = @lift Array($krEhr[1])
     Ehr = @lift vec(abs.(Array($krEhr[2]))) .+ 1e-9
 
+	qcolorrange = @lift (-maximum(abs.($q)), maximum(abs.($q)))
+
     fig = Figure(size=(1800, 600))
 
     axis_kwargs = (xlabel = "x",
@@ -99,7 +101,8 @@ function start!()
     @lift ylims!(axKE, 1e-9, max(1, 2*maximum($KE).data[2]))
     @lift ylims!(axKEspec, 1e-1, max(1, 2*maximum($Ehr)))
 
-    contourf!(axq, x, y, q; colormap = :balance)
+    heatmap!(axq, x, y, q; colormap = :balance, colorrange=qcolorrange)
+
     ke = lines!(axKE, KE; linewidth = 3)
     kespec = lines!(axKEspec, kr, Ehr; linewidth = 2)
     startwalltime = time()

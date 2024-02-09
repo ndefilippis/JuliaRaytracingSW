@@ -2,17 +2,19 @@
 module Parameters
 using Printf
 
-function compute_parameters(rd, l, avg_U, H, f)
+function compute_parameters(rd, l, avg_eddy_velocity, H, f)
     c₁ = 3.2
     c₂ = 0.36
     l_star = l/rd
     b2 = 1.;
     
-    U = avg_U / l_star
-    μ = 2*c₂*U/(rd*log(l_star/c₁)); # bottom drag
+	kappa_star = c₂/log(l_star/c₁) 
+    # U = kappa_star * avg_eddy_velocity/(2*pi^2)*log(l_star)/l_star
+	U = 0.8 * avg_eddy_velocity / l_star
+    μ = 2*U*kappa_star/rd; # bottom drag
     b1 = 4 * f^2 * rd^2/H + b2
     
-    # U = avg_U/l_star/sqrt(log(l_star));
+    # U = avg_U / l_star / sqrt(log(l_star));
     # V = U * l_star * log(l_star);
     
     return μ, b1, U
@@ -20,17 +22,18 @@ end
 
 # Integrator parameters
 stepper = "FilteredRK4"
-nsteps = 50000
-nx = 256 # number of grid points
+nsteps = 200000
+nx = 512 # number of grid points
 
 # Domain parameters
 Lx = 2π                   # domain size
 
 f = 1.             # Coriolis parameter and gravitational constant
 deformation_radius = 1/25
-intervortex_radius = 1/5
+intervortex_radius = 1/2.5
 avg_U = 0.1
-H = [0.5, 0.5]           # the rest depths of each layer
+H0 = Lx / 100
+H = [H0/2, H0/2]           # the rest depths of each layer
 nv = 8
 v = 0. # small scale dissipation term
 
