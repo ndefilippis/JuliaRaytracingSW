@@ -1,5 +1,4 @@
 module Raytracing
-using Interpolations;
 using DifferentialEquations;
 using NFFT
 
@@ -43,10 +42,10 @@ function _solve!(Npackets::Int, packets::AbstractArray{Float64, 2}, dt::Float64,
     ks = @views packets[:,3:4]
     problem = DynamicalODEProblem(dxdt, dkdt, xs, ks, tspan, params);
     sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
-    packets[i, 1] = sim[1,1]
-    packets[i, 2] = sim[2,1]
-    packets[i, 3] = sim[3,1]
-    packets[i, 4] = sim[4,1]
+    @views packets[:, 1] = sim[1,:]
+    @views packets[:, 2] = sim[2,:]
+    @views packets[:, 3] = sim[3,:]
+    @views packets[:, 4] = sim[4,:]
     return wavepackets;
 end
 
