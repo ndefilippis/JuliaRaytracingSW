@@ -127,16 +127,16 @@ end
 function set_up_problem(filename, stepper)
     L = 2π
     ic_file = jldopen(filename, "r")
-    ψh = ic_file["ic/ψh"]
-    @unpack g, f₀, β, ρ, H, U, μ = ic_file["params"]
+    ψh = file["snapshots/ψh/$index"]
+    @unpack f₀, β, b, H, U, μ = ic_file["params"]
     dt = ic_file["clock/dt"]
     nlayers = 2
     dev = Parameters.device;
     L = 2π
     nx = size(ψh, 2)
     U = U[1,1,:]
-    ρ = [ρ[1], ρ[2]]
-    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, g, H, ρ, U, μ, β, dt, stepper, aliased_fraction=0)
+    b = [b[1], b[2]]
+    prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, H, b, U, μ, β, dt, stepper, aliased_fraction=0)
     pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
     MultiLayerQG.updatevars!(prob)
     close(ic_file)
