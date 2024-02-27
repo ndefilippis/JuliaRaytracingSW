@@ -1,8 +1,10 @@
 # Parameters for two layer flows using GeophysicalFlows.jl
 module Parameters
 using Printf
+using FourierFlows
 
 # Integrator parameters
+device = GPU()
 nx = 384 # number of grid points
 
 # Domain parameters

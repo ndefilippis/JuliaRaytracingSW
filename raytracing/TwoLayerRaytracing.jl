@@ -4,6 +4,9 @@ using JLD2;
 using UnPack;
 using LinearAlgebra: ldiv!
 
+include("Parameters.jl");
+include("Raytracing.jl");
+
 import .Parameters;
 import .Raytracing;
 
@@ -14,7 +17,7 @@ function generate_initial_wavepackets(L, k0, Npackets, sqrtNpackets)
         for j = 1:sqrtNpackets
             x = [i*L/sqrtNpackets-L/2 - offset, j*L/sqrtNpackets-L/2 - offset];
             k = k0 * [cos(2*pi*((i-1)*sqrtNpackets + j)/Npackets), sin(2*pi*((i-1)*sqrtNpackets + j)/Npackets)];
-            wavepackets[(i-1)*sqrtNpackets + j] = Raytracing.Wavepacket(x, k);
+            wavepackets[(i-1)*sqrtNpackets + j] = Raytracing.Wavepacket(x, k, [0, 0]);
         end
     end
     return wavepackets;
@@ -25,29 +28,35 @@ function savepackets!(out, clock, packets::AbstractVector{Raytracing.Wavepacket}
     for i=1:size(packets, 1)
         out["p/x/$i/$(clock.step)"] = packets[i].x;
         out["p/k/$i/$(clock.step)"] = packets[i].k;
+		out["p/u/$i/$(clock.step)"] = packets[i].u
     end    
     return nothing;
 end
 
-function get_velocity_info(ψh, grid, params, v_info, grad_v_info, temp_field)
+function get_velocity_info(ψh, grid, params, v_info, grad_v_info, temp_in_field, temp_out_field)
     k = grid.kr;
     l = grid.l;
     
-    @. temp_field = -1im*l*ψh;
-    ldiv!(v_info.u, grid.rfftplan, temp_field)
+    @. temp_in_field = -1im*l*ψh;
+    ldiv!(temp_out_field, grid.rfftplan, temp_in_field)
+	@. v_info.u = temp_out_field
     
-    @. temp_field = 1im*k*ψh;
-    ldiv!(v_info.v, grid.rfftplan, temp_field)
+    @. temp_in_field = 1im*k*ψh;
+    ldiv!(temp_out_field, grid.rfftplan, temp_in_field)
+    @. v_info.v = temp_out_field
     
     
-    @. temp_field = k*l*ψh;
-    ldiv!(grad_v_info.ux, grid.rfftplan, temp_field)
+    @. temp_in_field = k*l*ψh;
+    ldiv!(temp_out_field, grid.rfftplan, temp_in_field)
+    @. grad_v_info.ux = temp_out_field
     
-    @. temp_field = l*l*ψh;
-    ldiv!(grad_v_info.uy, grid.rfftplan, temp_field)
+    @. temp_in_field = l*l*ψh;
+    ldiv!(temp_out_field, grid.rfftplan, temp_in_field)
+    @. grad_v_info.uy = temp_out_field
     
-    @. temp_field = -k*k*ψh;
-    ldiv!(grad_v_info.vx, grid.rfftplan, temp_field)
+    @. temp_in_field = -k*k*ψh;
+    ldiv!(temp_out_field, grid.rfftplan, temp_in_field)
+    @. grad_v_info.vx = temp_out_field
     
     @. grad_v_info.vy = -grad_v_info.ux
     return nothing
@@ -79,16 +88,19 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
     
     new_velocity = Raytracing.Velocity(u2_background, v2_background)
     new_grad_v = Raytracing.VelocityGradient(ux2_background, uy2_background, vx2_background, vy2_background)
-    temp_field = Array{Complex{Float64}}(undef, grid.nkr, grid.nl)
+	
+	Dev = typeof(grid.device)
+	@devzeros Dev Complex{Float64} (grid.nkr, grid.nl) temp_device_in_field
+    @devzeros Dev Float64 (grid.nx, grid.ny) temp_device_out_field
     
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     
     savepackets!(out, clock, packets)
     startwalltime = time()
-    frames = 0:round(Int, nsteps / nsubs)
-	packet_frames = 0:round(Int, nsubs / npacketsubs)
+    frames = 0:round(Int, nsteps / npacketsubs)
+	packet_frames = 1:round(Int, npacketsubs / nsubs)
 	
-	get_sol(prob) = Array(prob.vars.ψh)
+	get_sol(prob) = prob.vars.ψh
     for j=frames
         if j % (100 / nsubs) == 0
             cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
@@ -99,15 +111,17 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             println(log)
             flush(stdout)
         end
+
+		get_background_u(prob) = (@views(get_sol(prob)[:,:,1]) + @views(get_sol(prob)[:,:,2]))/2
         
-		get_velocity_info(@views(get_sol(prob)[:,:,1]), grid, packet_params, old_velocity, old_grad_v, temp_field);
+		get_velocity_info(get_background_u(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
         old_t = clock.t
         
 		for k=packet_frames
 	        stepforward!(prob, [], nsubs);
             MultiLayerQG.updatevars!(prob);
 
-            get_velocity_info(@views(get_sol(prob)[:,:,1]), grid, packet_params, new_velocity, new_grad_v, temp_field);
+            get_velocity_info(get_background_u(prob), grid, packet_params, new_velocity, new_grad_v, temp_device_in_field, temp_device_out_field);
             new_t = clock.t;
 
             Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (packet_params.packetVelocityScale * old_t, packet_params.packetVelocityScale * new_t), packet_params);
@@ -120,24 +134,24 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
     end 
 end
 
-function stepraysforward!(grid, packets, velocity1, dvelocity1, velocity2, dvelocity2, tspan, params)
-    
-end
-
-function set_up_problem(filename, stepper)
+function set_up_problem(filename, stepper, dev)
     L = 2π
     ic_file = jldopen(filename, "r")
-    ψh = file["snapshots/ψh/$index"]
+	index = keys(ic_file["snapshots/t"])[1]
+    ψh = ic_file["snapshots/ψh/$index"]
     @unpack f₀, β, b, H, U, μ = ic_file["params"]
     dt = ic_file["clock/dt"]
     nlayers = 2
-    dev = Parameters.device;
     L = 2π
     nx = size(ψh, 2)
     U = U[1,1,:]
     b = [b[1], b[2]]
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, H, b, U, μ, β, dt, stepper, aliased_fraction=0)
-    pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
+    
+	MultiLayerQG.streamfunctionfrompv!(prob.vars.ψh, device_array(dev)(ψh), prob.params, prob.grid)
+	MultiLayerQG.pvfromstreamfunction!(prob.sol, prob.vars.ψh, prob.params, prob.grid)
+	# pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
+	# TEMPORARY FIX BECUASE INITAL CONDITIONS ARE SAVING Q NOT PSI
     MultiLayerQG.updatevars!(prob)
     close(ic_file)
     return nx, dt, prob
@@ -145,13 +159,15 @@ end
 
 
 function start!()
-    Lx, stepper = Parameters.L, Parameters.stepper;
-    nx, dt, prob = set_up_problem(Parameters.initial_condition_file, stepper);
+    Lx, stepper, device = Parameters.L, Parameters.stepper, Parameters.device;
+    nx, dt, prob = set_up_problem(Parameters.initial_condition_file, stepper, device);
     
     nsteps, nsubs, npacketsubs, packetSpinUpDelay = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay
     
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
-    f, g, H = params.f₀, params.g, params.H
+    f = params.f₀
+	g = 1
+	H = 1
 
 
     filename = joinpath(Parameters.filepath, Parameters.filename)
@@ -162,7 +178,7 @@ function start!()
 
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
-    Cg = sqrt(g*H[1])
+    Cg = sqrt(g*H)
     
     # omega^2 = f^2 + gH*k^2
     # alpha^2*f^2 = f^2 + Cg^2*k^2
@@ -170,7 +186,7 @@ function start!()
     # k = f/Cg*sqrt(alpha^2 - 1)
     packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
-    packetVelocityScale = Parameters.initialFroudeNumber * Cg / rms_U
+    packetVelocityScale = 1 # Parameters.initialFroudeNumber * Cg / rms_U
     packet_params = (f = f, Cg = Cg / packetVelocityScale, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
     close(out)

@@ -5,6 +5,7 @@ using DifferentialEquations;
 struct Wavepacket
     x::Vector{Float64}
     k::Vector{Float64}
+	u::Vector{Float64}
 end
 
 struct Velocity
@@ -105,11 +106,13 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     Threads.@threads for i=1:Npackets
 	#for i=1:Npackets
         problem = DynamicalODEProblem(dxdt, dkdt, wavepackets[i].x, wavepackets[i].k, tspan, params);
-        local sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
+        local sim = solve(problem, Tsit5(), dt=dt, save_on=false, save_start=false);
         wavepackets[i].x[1] = sim[1,1];
 		wavepackets[i].x[2] = sim[2,1];
 		wavepackets[i].k[1] = sim[3,1];
 		wavepackets[i].k[2] = sim[4,1];
+		wavepackets[i].u[1] = params.u(wavepackets[i].x[1], wavepackets[i].x[2], tspan[2])
+		wavepackets[i].u[2] = params.v(wavepackets[i].x[1], wavepackets[i].x[2], tspan[2])
     end
     return wavepackets;
 end
@@ -150,7 +153,7 @@ function interpolator(field, x, y)
     # return cubic_spline_interpolation((grid.x, grid.y), field, extrapolation_bc = Periodic());
     return extrapolate(
             scale(
-                interpolate(field, BSpline(Quadratic(Periodic(OnCell())))), 
+                interpolate(field, BSpline(Cubic(Periodic(OnCell())))), 
             x, y), 
         Periodic());
 end

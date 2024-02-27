@@ -25,34 +25,37 @@ function kinetic_energy_spectrum(solution, grid)
     return (KEtr, KEgr, KEwr)
 end
 
-function set_initial_condition(prob; k0=0, Et=0.0, Eg=0.0, Ew=0.0)
+function set_initial_condition(prob; k0w=0, k0g=0, Et=0.0, Eg=0.0, Ew=0.0)
     grid = prob.grid
     dev = grid.device
     seed!(5678)
     
-    filter = (grid.Krsq .<= k0^2)
+	k0w_min = k0w - 2
+	k0g_min = k0g - 2
+    wave_filter = (k0w_min^2 .<= grid.Krsq .<= k0^2)
+	geo_filter  = (k0g_min^2 .<= grid.Krsq .<= k0g^2)
     
     θ  = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₀ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₊ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     θ₋ = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
-    ϕ  = @. exp(2*π*im*θ ) * filter
-    ϕ₀ = @. exp(2*π*im*θ₀) * filter
-    ϕ₊ = @. exp(2*π*im*θ₊) * filter
-    ϕ₋ = @. exp(2*π*im*θ₋) * filter
+    ϕ  = @. exp(2*π*im*θ )
+    ϕ₀ = @. exp(2*π*im*θ₀)
+    ϕ₊ = @. exp(2*π*im*θ₊)
+    ϕ₋ = @. exp(2*π*im*θ₋)
     
     Φ₀ = compute_balanced_basis(grid)
     Φ₊, Φ₋ = compute_wave_bases(grid)
     
-    ψth = ϕ
+    ψth = ϕ .* geo_filter
     
-    ugh = Φ₀[:,:,1] .* ϕ₀
-    vgh = Φ₀[:,:,2] .* ϕ₀
-    pgh = Φ₀[:,:,3] .* ϕ₀
+    ugh = Φ₀[:,:,1] .* ϕ₀ .* geo_filter
+    vgh = Φ₀[:,:,2] .* ϕ₀ .* geo_filter
+    pgh = Φ₀[:,:,3] .* ϕ₀ .* geo_filter
     
-    uwh = Φ₊[:,:,1] .* ϕ₊ + Φ₋[:,:,1] .* ϕ₋
-    vwh = Φ₊[:,:,2] .* ϕ₊ + Φ₋[:,:,2] .* ϕ₋
-    pwh = Φ₊[:,:,3] .* ϕ₊ + Φ₋[:,:,3] .* ϕ₋
+    uwh = (Φ₊[:,:,1] .* ϕ₊ + Φ₋[:,:,1] .* ϕ₋) .* wave_filter
+    vwh = (Φ₊[:,:,2] .* ϕ₊ + Φ₋[:,:,2] .* ϕ₋) .* wave_filter
+    pwh = (Φ₊[:,:,3] .* ϕ₊ + Φ₋[:,:,3] .* ϕ₋) .* wave_filter
     
     btE = parsevalsum2(sqrt.(grid.Krsq) .* ψth, grid)
     
@@ -116,7 +119,7 @@ function start!()
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
 
-    set_initial_condition(prob; k0=Parameters.k0, Et=Parameters.Et, Eg=Parameters.Eg, Ew=Parameters.Ew)
+    set_initial_condition(prob; k0g=Parameters.k0g, k0w=Parameters.k0w, Et=Parameters.Et, Eg=Parameters.Eg, Ew=Parameters.Ew)
 
     filepath = "."
     filename = joinpath(filepath, Parameters.filename)

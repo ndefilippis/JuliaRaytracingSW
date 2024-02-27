@@ -3,5 +3,7 @@
 slurm*.out
 *.mp4
 *.pdf
+*.svg
+*.png
 *.jld2
 images/

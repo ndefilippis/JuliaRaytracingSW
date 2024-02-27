@@ -23,7 +23,8 @@ end
 
 # Integrator parameters
 stepper = "FilteredRK4"
-nsteps = 100000
+# nsteps = 100000
+total_time = 1200.
 nx = 512 # number of grid points
 device = GPU()
 
@@ -33,14 +34,14 @@ Lx = 2π                   # domain size
 f = 1.             # Coriolis parameter and gravitational constant
 deformation_radius = 1/15
 intervortex_radius = 1/2
-avg_U = 0.1
+avg_U = parse(Float64, ARGS[1])
 H0 = 1
 H = [H0/2, H0/2]           # the rest depths of each layer
 nv = 8
 v = 0. # small scale dissipation term
 
 dx = Lx / nx
-dt = 0.02 * dx / avg_U
+dt = 0.05 * dx / avg_U
 
 b2 = 1.
 μ, b1, shear_strength = compute_parameters(deformation_radius, intervortex_radius, avg_U, sum(H), f)
@@ -51,8 +52,10 @@ b = [b1, b2]
 # Initial condition parameters
 q0_amplitude = 1e-2*avg_U # Height of initial q
 
+# Set nsteps
+nsteps = Int(ceil(total_time / dt))
 # Output parameters
-nsubs = 50;
+nsubs = 400;
 filepath = "."
 output_filename = "2layer_test.jld2"
 snapshot_filename = @sprintf("initial_condition_%dx%d_U=%.2f.jld2", nx, nx, avg_U)

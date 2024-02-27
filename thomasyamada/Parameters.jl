@@ -1,6 +1,6 @@
 module Parameters
     # Simulation parameters
-    nx = 384
+    nx = 512
     Ro = 0.2 # Rossby number
     ν  = 2.4e-34
     nν = 8
@@ -10,13 +10,14 @@ module Parameters
     stepper = "ETDRK4"
 
     # Output parameters
-    nsteps = 100000
+    nsteps = 500000
     nsubs  = 250    # Number of timesteps before outputting
     filename = "ty.jld2"
     
     # Initial condition parameters
-    k0 = 6
-    Et = 0.02 # Initial barotropic energy
+    k0w = 15
+	k0g = 6
+    Et = 0.5 # Initial barotropic energy
     Eg = Et  # Initial baroclinic geostrophic balanced energy
-    Ew = 4 # Initial baroclinic inertia-gravity wave energy
+    Ew = 0 # Initial baroclinic inertia-gravity wave energy
 end

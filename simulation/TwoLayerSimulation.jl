@@ -12,7 +12,7 @@ end
 
 
 function start!()
-    dev = GPU()
+    dev = Parameters.device
     nx = Parameters.nx
     stepper = Parameters.stepper  # timestepper
     nsteps = Parameters.nsteps # total number of time-steps
@@ -57,8 +57,7 @@ function start!()
     filename = joinpath(filepath, Parameters.output_filename)
     if isfile(filename); rm(filename); end
 
-    get_sol(prob) = Array(prob.sol) # extracts the Fourier-transformed solution
-    get_streamfunc(prob) = prob.vars.ψh
+    get_streamfunc(prob) = Array(prob.vars.ψh)
     # out = Output(prob, filename, (:ψh, get_streamfunc))
 
     Lx, Ly = grid.Lx, grid.Ly
@@ -134,7 +133,7 @@ function start!()
     snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)
     if isfile(snapshot_filename); rm(snapshot_filename); end
     
-    snapshot_out = Output(prob, snapshot_filename, (:ψh, get_sol))
+    snapshot_out = Output(prob, snapshot_filename, (:ψh, get_streamfunc))
     saveproblem(snapshot_out)
     saveoutput(snapshot_out)
 end

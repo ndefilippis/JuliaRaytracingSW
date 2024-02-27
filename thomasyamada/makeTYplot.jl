@@ -32,14 +32,14 @@ function create_fig(grid)
     fig = Figure(size=(1200,400))
     axζ = Axis(fig[1,1][1,1]; title="ζ_T")
     axq = Axis(fig[1,2][1,1]; title="q_C")
-    axKEspec = Axis(fig[1, 3],
+    axKEspec = Axis(fig[2,1],
             xlabel = L"k_r",
             ylabel = L"Energy",
             xscale = log10,
             yscale = log10,
             title = "Radial energy spectrum",
             aspect = 1,
-            limits = ((1.0, maximum(grid.kr)), (1e-1, 1)))
+            limits = ((1.0, maximum(grid.kr)), (1e-9, 1)))
     
     return fig, axζ, axq, axKEspec
 end
@@ -73,11 +73,10 @@ function make_plot(jldfile)
         ζt = @lift $ζtqc[1]
         qc = @lift $ζtqc[2]
         
-        ζmax = maximum(abs.(ζt[]))
-        qmax = maximum(abs.(qc[]))
-        cfactor = 1.2
-        ζhm = heatmap!(axζ, grid.x, grid.y, ζt; colormap = :balance, colorrange=(-cfactor*ζmax, cfactor*ζmax))
-        qhm = heatmap!(axq, grid.x, grid.y, qc; colormap = :balance, colorrange=(-cfactor*qmax, cfactor*qmax))
+        ζcolorrange = @lift (-maximum(abs.($ζt)), maximum(abs.($ζt)))
+        qcolorrange = @lift (-maximum(abs.($qc)), maximum(abs.($qc)))
+        ζhm = heatmap!(axζ, grid.x, grid.y, ζt; colormap = :balance, colorrange=ζcolorrange)
+        qhm = heatmap!(axq, grid.x, grid.y, qc; colormap = :balance, colorrange=qcolorrange)
         Colorbar(fig[1,1][2, 1], ζhm, vertical=false, flipaxis = false)
         Colorbar(fig[1,2][2, 1], qhm, vertical=false, flipaxis = false)
         
@@ -91,10 +90,14 @@ function make_plot(jldfile)
         lines!(axKEspec, kr, Egr, label="E_G"; linewidth = 2)
         lines!(axKEspec, kr, Ewr, label="E_W"; linewidth = 2)
         axislegend(axKEspec)
-        ylims!(axKEspec, 1e-3, 10 * max(maximum(Etr[]), maximum(Egr[]), maximum(Ewr[])))
+        ylims!(axKEspec, 1e-9, 5 * max(maximum(Etr[]), maximum(Egr[]), maximum(Ewr[])))
         println("Creating plot...")
+		step = 0
         record(fig, "thomas_yamada_energy.mp4", frames, framerate = 18) do frame
-            solution[] = file["snapshots/sol"][frame]
+            if(step % 300 == 0)
+				println(step)
+			end
+			solution[] = file["snapshots/sol"][frame]
             t[] = file["snapshots/t"][frame]
         end
         println("Plot thomas_yamada_energy.mp4 created")
