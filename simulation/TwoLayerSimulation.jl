@@ -58,7 +58,7 @@ function start!()
     if isfile(filename); rm(filename); end
 
     get_streamfunc(prob) = Array(prob.vars.ψh)
-    # out = Output(prob, filename, (:ψh, get_streamfunc))
+    out = Output(prob, filename, (:ψh, get_streamfunc))
 
     Lx, Ly = grid.Lx, grid.Ly
 
@@ -108,8 +108,9 @@ function start!()
 
     frames = 0:round(Int, nsteps / nsubs)
 
-    # saveproblem(out)
-    CairoMakie.record(fig, "movie.mp4", frames, framerate = 18) do j
+    saveproblem(out)
+    # CairoMakie.record(fig, "movie.mp4", frames, framerate = 18) do j
+	for j=frames
       if j % (1000 / nsubs) == 0
         cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
         u_max = maximum([maximum(abs.(vars.u)), maximum(abs.(vars.v))])
@@ -127,7 +128,7 @@ function start!()
 
       stepforward!(prob, diags, nsubs)
       MultiLayerQG.updatevars!(prob)
-      # saveoutput(out);
+      saveoutput(out);
     end
     
     snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)

@@ -148,10 +148,9 @@ function set_up_problem(filename, stepper, dev)
     b = [b[1], b[2]]
     prob = MultiLayerQG.Problem(nlayers, dev; nx, Lx=L, f₀, H, b, U, μ, β, dt, stepper, aliased_fraction=0)
     
-	MultiLayerQG.streamfunctionfrompv!(prob.vars.ψh, device_array(dev)(ψh), prob.params, prob.grid)
-	MultiLayerQG.pvfromstreamfunction!(prob.sol, prob.vars.ψh, prob.params, prob.grid)
-	# pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
-	# TEMPORARY FIX BECUASE INITAL CONDITIONS ARE SAVING Q NOT PSI
+	#MultiLayerQG.streamfunctionfrompv!(prob.vars.ψh, device_array(dev)(ψh), prob.params, prob.grid)
+	#MultiLayerQG.pvfromstreamfunction!(prob.sol, prob.vars.ψh, prob.params, prob.grid)
+	MultiLayerQG.pvfromstreamfunction!(prob.sol, device_array(dev)(ψh), prob.params, prob.grid)
     MultiLayerQG.updatevars!(prob)
     close(ic_file)
     return nx, dt, prob
@@ -162,8 +161,10 @@ function start!()
     Lx, stepper, device = Parameters.L, Parameters.stepper, Parameters.device;
     nx, dt, prob = set_up_problem(Parameters.initial_condition_file, stepper, device);
     
-    nsteps, nsubs, npacketsubs, packetSpinUpDelay = Parameters.nsteps, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay
+    total_time, nsubs, npacketsubs, packetSpinUpDelay = Parameters.total_time, Parameters.nsubs, Parameters.npacketsubs, Parameters.packetSpinUpDelay
     
+	nsteps = Int(ceil(total_time / dt))
+	println("Number of steps: ", nsteps)
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     f = params.f₀
 	g = 1

@@ -1,0 +1,7 @@
+ArrayTaskID initial_condition_file
+1 initial_conditions/initial_condition_512x512_U=0.10.jld2
+2 initial_conditions/initial_condition_512x512_U=0.20.jld2
+3 initial_conditions/initial_condition_512x512_U=0.30.jld2 
+4 initial_conditions/initial_condition_512x512_U=0.40.jld2 
+5 initial_conditions/initial_condition_512x512_U=0.50.jld2
+6 initial_conditions/initial_condition_512x512_U=0.60.jld2

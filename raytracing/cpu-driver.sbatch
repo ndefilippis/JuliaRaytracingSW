@@ -13,7 +13,7 @@ export NUM_JULIA_THREADS=`nproc`
 
 rundir=$SCRATCH/twolayer_raytracing/$SLURM_JOB_ID
 mkdir -p $rundir
-cp driver.sbatch Driver.jl TwoLayerRaytracing.jl Raytracing.jl initial_condition.jld2 $rundir
+cp cpu-driver.sbatch Driver.jl TwoLayerRaytracing.jl Raytracing.jl initial_condition.jld2 $rundir
 cp initial_condition_U0.1.jld2 $rundir/initial_condition.jld2
 cp CPUParameters.jl $rundir/Parameters.jl
 cd $rundir

@@ -24,7 +24,7 @@ end
 # Integrator parameters
 stepper = "FilteredRK4"
 # nsteps = 100000
-total_time = 1200.
+total_time = 2000.
 nx = 512 # number of grid points
 device = GPU()
 
@@ -41,7 +41,7 @@ nv = 8
 v = 0. # small scale dissipation term
 
 dx = Lx / nx
-dt = 0.05 * dx / avg_U
+dt = 0.1 * dx / avg_U
 
 b2 = 1.
 μ, b1, shear_strength = compute_parameters(deformation_radius, intervortex_radius, avg_U, sum(H), f)
@@ -55,9 +55,9 @@ q0_amplitude = 1e-2*avg_U # Height of initial q
 # Set nsteps
 nsteps = Int(ceil(total_time / dt))
 # Output parameters
-nsubs = 400;
+nsubs = 1#round(Int, 1/4/dt); # Save every 6 hours
 filepath = "."
-output_filename = "2layer_test.jld2"
+output_filename = "2layer_6hr.jld2"
 snapshot_filename = @sprintf("initial_condition_%dx%d_U=%.2f.jld2", nx, nx, avg_U)
 
 end

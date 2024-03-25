@@ -7,7 +7,7 @@
 #SBATCH --mem=32GB
 #SBATCH --time=12:00:00
 #SBATCH --job-name=2Lsim
-#SBATCH --array=1-10
+#SBATCH --array=1-1
 
 module purge
 

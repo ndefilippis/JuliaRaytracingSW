@@ -32,7 +32,7 @@ function create_fig(grid)
     fig = Figure(size=(1200,400))
     axζ = Axis(fig[1,1][1,1]; title="ζ_T")
     axq = Axis(fig[1,2][1,1]; title="q_C")
-    axKEspec = Axis(fig[2,1],
+    axKEspec = Axis(fig[1,3],
             xlabel = L"k_r",
             ylabel = L"Energy",
             xscale = log10,
@@ -46,9 +46,9 @@ end
 
 function kinetic_energy_spectrum(solution, grid)
     Gh, Wh = decompose_balanced_wave(solution, grid)
-    KEth = solution[:,:,1].^2
-    KEgh = Gh[:,:,1].^2 + Gh[:,:,2].^2
-    KEwh = Wh[:,:,1].^2 + Wh[:,:,2].^2
+    KEth = abs2.(solution[:,:,1])
+    KEgh = abs2.(Gh[:,:,1]) + abs2.(Gh[:,:,2])
+    KEwh = abs2.(Wh[:,:,1]) + abs2.(Wh[:,:,2])
     KEtr = FourierFlows.radialspectrum(KEth, grid, refinement = 1)  
     KEgr = FourierFlows.radialspectrum(KEgh, grid, refinement = 1)
     KEwr = FourierFlows.radialspectrum(KEwh, grid, refinement = 1)
@@ -73,12 +73,12 @@ function make_plot(jldfile)
         ζt = @lift $ζtqc[1]
         qc = @lift $ζtqc[2]
         
-        ζcolorrange = @lift (-maximum(abs.($ζt)), maximum(abs.($ζt)))
-        qcolorrange = @lift (-maximum(abs.($qc)), maximum(abs.($qc)))
+        ζcolorrange = @lift (-maximum(abs.($ζt))-1e-9, maximum(abs.($ζt))+1e-9)
+        qcolorrange = @lift (-maximum(abs.($qc))-1e-9, maximum(abs.($qc))+1e-9)
         ζhm = heatmap!(axζ, grid.x, grid.y, ζt; colormap = :balance, colorrange=ζcolorrange)
         qhm = heatmap!(axq, grid.x, grid.y, qc; colormap = :balance, colorrange=qcolorrange)
-        Colorbar(fig[1,1][2, 1], ζhm, vertical=false, flipaxis = false)
-        Colorbar(fig[1,2][2, 1], qhm, vertical=false, flipaxis = false)
+        #Colorbar(fig[1,1][2, 1], ζhm, vertical=false, flipaxis = false)
+        #Colorbar(fig[1,2][2, 1], qhm, vertical=false, flipaxis = false)
         
         energies = @lift kinetic_energy_spectrum($solution, grid)
         kr = @lift $energies[1][1]
