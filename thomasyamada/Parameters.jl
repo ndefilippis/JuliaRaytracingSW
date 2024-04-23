@@ -1,17 +1,18 @@
 module Parameters
     # Simulation parameters
+    Lx = 6π
     nx = 512
     Ro = 0.2 # Rossby number
-    ν  = 2.4e-34
+    ν  = 5.0e-34 * (Lx/(2π))^16
     nν = 8
 
     # Time stepping parameters
-    dt = 0.5e-2
+    dt = 5e-2
     stepper = "ETDRK4"
 
     # Output parameters
     nsteps = 200000
-    nsubs  = 250    # Number of timesteps before outputting
+    nsubs  = 50    # Number of timesteps before outputting
     filename = "ty.jld2"
     
     # Initial condition parameters

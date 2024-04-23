@@ -36,9 +36,10 @@ function compute_wave_bases(grid)
     return (Φ₊, Φ₋)
 end
 
-function decompose_balanced_wave2(solutions, grid)
-    baroclinic_components = solution[,:, 2:4]
-
+function decompose_balanced_wave2(solution, grid)
+    baroclinic_components = solution[:,:,2:4]
+    uc = baroclinic_components[:,:,1]
+    vc = baroclinic_components[:,:,2] 
 end
 
 function decompose_balanced_wave(solution, grid)

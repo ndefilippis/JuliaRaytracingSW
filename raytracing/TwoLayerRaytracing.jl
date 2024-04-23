@@ -125,6 +125,12 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             new_t = clock.t;
 
             Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (packet_params.packetVelocityScale * old_t, packet_params.packetVelocityScale * new_t), packet_params);
+            for i=1:packet_params.Npackets
+                if(packets[i].k[1]^2 + packets[i].k[2]^2 >= Parameters.k_cutoff^2)
+                    packets[i].k[1] = packet_params.k0
+                    packets[i].k[2] = 0
+                end
+            end
             # stepraysforward!(grid, packets, old_v, new_v, (old_t / packet_params.packetVelocityScale, new_t / packet_params.packetVelocityScale), packet_params);
             old_velocity = new_velocity;
             old_grad_v = new_grad_v;
@@ -185,10 +191,12 @@ function start!()
     # alpha^2*f^2 = f^2 + Cg^2*k^2
     # f^2(alpha^2 - 1)/gH = k^2
     # k = f/Cg*sqrt(alpha^2 - 1)
-    packets = generate_initial_wavepackets(Lx, sqrt(Parameters.corFactor^2 - 1)*f/Cg, Npackets, Parameters.sqrtNpackets);
+
+    k0 = sqrt(Parameters.corFactor^2 - 1)*f/Cg
+    packets = generate_initial_wavepackets(Lx, k0, Npackets, Parameters.sqrtNpackets);
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
     packetVelocityScale = 1 # Parameters.initialFroudeNumber * Cg / rms_U
-    packet_params = (f = f, Cg = Cg / packetVelocityScale, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale);
+    packet_params = (f = f, Cg = Cg / packetVelocityScale, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale, k0=k0);
     simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
     close(out)
 end

@@ -46,7 +46,7 @@ end
 
 function kinetic_energy_spectrum(solution, grid)
     Gh, Wh = decompose_balanced_wave(solution, grid)
-    KEth = abs2.(solution[:,:,1])
+    KEth =  grid.invKrsq .* abs2.(solution[:,:,1])
     KEgh = abs2.(Gh[:,:,1]) + abs2.(Gh[:,:,2])
     KEwh = abs2.(Wh[:,:,1]) + abs2.(Wh[:,:,2])
     KEtr = FourierFlows.radialspectrum(KEth, grid, refinement = 1)  
@@ -73,8 +73,8 @@ function make_plot(jldfile)
         ζt = @lift $ζtqc[1]
         qc = @lift $ζtqc[2]
         
-        ζcolorrange = @lift (-maximum(abs.($ζt))-1e-9, maximum(abs.($ζt))+1e-9)
-        qcolorrange = @lift (-maximum(abs.($qc))-1e-9, maximum(abs.($qc))+1e-9)
+        ζcolorrange = @lift (-maximum(abs.($ζt))-eps(), maximum(abs.($ζt))+eps())
+        qcolorrange = @lift (-maximum(abs.($qc))-eps(), maximum(abs.($qc))+eps())
         ζhm = heatmap!(axζ, grid.x, grid.y, ζt; colormap = :balance, colorrange=ζcolorrange)
         qhm = heatmap!(axq, grid.x, grid.y, qc; colormap = :balance, colorrange=qcolorrange)
         #Colorbar(fig[1,1][2, 1], ζhm, vertical=false, flipaxis = false)
@@ -82,9 +82,9 @@ function make_plot(jldfile)
         
         energies = @lift kinetic_energy_spectrum($solution, grid)
         kr = @lift $energies[1][1]
-        Etr = @lift vec(abs.($energies[1][2])) .+ 1e-9
-        Egr = @lift vec(abs.($energies[2][2])) .+ 1e-9
-        Ewr = @lift vec(abs.($energies[3][2])) .+ 1e-9
+        Etr = @lift vec(abs.($energies[1][2])) .+ eps()
+        Egr = @lift vec(abs.($energies[2][2])) .+ eps()
+        Ewr = @lift vec(abs.($energies[3][2])) .+ eps()
         
         lines!(axKEspec, kr, Etr, label="E_T"; linewidth = 2)
         lines!(axKEspec, kr, Egr, label="E_G"; linewidth = 2)

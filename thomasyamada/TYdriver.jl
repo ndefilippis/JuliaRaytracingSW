@@ -127,12 +127,12 @@ function start!()
     if isfile(filename); rm(filename); end
     
     get_sol(prob) = Array(prob.sol)
-    out = Output(prob, filename, (:sol, get_sol))
     
     bcE = Diagnostic(baroclinic_energy, prob; nsteps)
     btE = Diagnostic(barotropic_energy, prob; nsteps)
     diags = [bcE, btE]
 
+    out = Output(prob, filename, (:sol, get_sol), (:bcE, bcE), (:btE, btE))
     # ζt = Observable(Array(vars.ζt))
     # qc = Observable(Array(vars.qc))
     # solution = Observable(Array(sol))

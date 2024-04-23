@@ -3,10 +3,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
-#SBATCH --mem=32GB
+#SBATCH --mem=36GB
 #SBATCH --time=6-23:00:00
 #SBATCH --job-name=2Lray
-#SBATCH --array=1-1
+#SBATCH --array=1-2
 
 module purge
 

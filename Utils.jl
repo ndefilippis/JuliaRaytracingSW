@@ -41,3 +41,19 @@ function display_energetics(prob)
     println(@sprintf("real bot KE:%10.5f", KE₂))
     println(@sprintf("real tot KE:%10.5f", KE₁ + KE₂))
 end
+
+struct CollatedOutput
+    output_file
+    line_limit :: Int
+    line_index :: Int
+    file_pattern :: String
+    file_index :: Int
+end
+
+function write_jld2_line(output::CollatedOutput, key::String, value::Any)
+    output.output_file[key] = value
+    output.line_index += 1
+    if (output.line_index >= output.line_limit)
+        
+    end
+end
