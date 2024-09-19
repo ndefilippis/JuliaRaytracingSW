@@ -1,6 +1,6 @@
 using GeophysicalFlows, CairoMakie, Printf;
 using Random: seed!
-using FourierFlows: parsevalsum2
+using FourierFlows: parsevalsum2, parsevalsum
 
 import .Parameters
 
@@ -46,15 +46,21 @@ function start!()
     θ_bc = device_array(dev)(rand(Float64, (grid.nkr, grid.nl)))
     ψh_bt = @. exp(2*π*im*θ_bt) * k_filter
     ψh_bc = @. exp(2*π*im*θ_bc) * k_filter
+
+    ψ_bt = irfft(ψh_bt, grid.nx, (1, 2))
+    ψ_bc = irfft(ψh_bc, grid.nx, (1, 2))
     
-    ψh_bt *= sqrt(Parameters.bt_energy / parsevalsum2(sqrt.(grid.Krsq) .* ψh_bt, grid))
-    ψh_bc *= sqrt(Parameters.bc_energy / parsevalsum2(sqrt.(grid.Krsq) .* ψh_bc, grid))
+    ηt_max = maximum(ψ_bt) * Parameters.g * Parameters.H0
+    ηc_max = maximum(ψ_bc) * Parameters.g * Parameters.H0
+
+    ψh_bt *= Parameters.ag_bt / ηt_max
+    ψh_bc *= Parameters.ag_bc / ηc_max
     
     prob.vars.ψh[:, :, 1] = ψh_bt + ψh_bc
     prob.vars.ψh[:, :, 2] = ψh_bt - ψh_bc
     MultiLayerQG.pvfromstreamfunction!(prob.sol, prob.vars.ψh, params, grid)
     MultiLayerQG.updatevars!(prob)
-
+    println(parsevalsum2(prob.vars.uh[:,:,1], grid))
     # Create Diagnostics -- `energies` function is imported at the top.
     radialE = Diagnostic(modal_energy, prob; nsteps)
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
@@ -143,5 +149,9 @@ function start!()
     
     snapshot_out = Output(prob, snapshot_filename, (:ψh, get_streamfunc))
     saveproblem(snapshot_out)
+    for diag in diags
+        savediagnostic(diag, "energy", "diagnostic_file.jld2") 
+    end
     saveoutput(snapshot_out)
+    println(parsevalsum2(prob.vars.uh[:,:,1], grid))
 end

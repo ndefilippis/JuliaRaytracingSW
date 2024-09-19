@@ -2,16 +2,20 @@ module ThomasYamada
 export
   Problem,
   set_solution!,
+  enforce_reality_condition!,
   updatevars!,
 
   barotropic_energy,
   baroclinic_energy,
+  wave_geostrophic_energy,
   parsevalsum2
 
 using FourierFlows
 using FourierFlows: parsevalsum2
 
 using LinearAlgebra: mul!, ldiv!
+include("./TYUtils.jl")
+using .TYUtils: decompose_balanced_wave
 
 struct Params{T} <: AbstractParams
    ν :: T         # Hyperviscosity coefficient
@@ -92,6 +96,28 @@ function updatevars!(prob)
     ldiv!(vars.ut, grid.rfftplan, deepcopy(vars.uth)) # use deepcopy() because irfft destroys its input
     ldiv!(vars.vt, grid.rfftplan, deepcopy(vars.vth)) # use deepcopy() because irfft destroys its input
     ldiv!(vars.qc, grid.rfftplan, deepcopy(vars.qch)) # use deepcopy() because irfft destroys its input
+    
+    return nothing
+end
+
+function enforce_reality_condition!(prob)
+    vars, grid, sol = prob.vars, prob.grid, prob.sol
+
+    dealias!(sol, grid)
+    @. vars.ζth = sol[:,:,1]
+    @. vars.uch = sol[:,:,2]
+    @. vars.vch = sol[:,:,3]
+    @. vars.pch = sol[:,:,4]
+
+    ldiv!(vars.ζt, grid.rfftplan, deepcopy(sol[:,:,1])) # use deepcopy() because irfft destroys its input
+    ldiv!(vars.uc, grid.rfftplan, deepcopy(sol[:,:,2])) # use deepcopy() because irfft destroys its input
+    ldiv!(vars.vc, grid.rfftplan, deepcopy(sol[:,:,3])) # use deepcopy() because irfft destroys its input
+    ldiv!(vars.pc, grid.rfftplan, deepcopy(sol[:,:,4])) # use deepcopy() because irfft destroys its input
+        
+    mul!(sol[:,:,1], grid.rfftplan, vars.ζt)
+    mul!(sol[:,:,2], grid.rfftplan, vars.uc)
+    mul!(sol[:,:,3], grid.rfftplan, vars.vc)
+    mul!(sol[:,:,4], grid.rfftplan, vars.pc)
     
     return nothing
 end
@@ -253,7 +279,7 @@ function Equation(params, grid)
     dev = grid.device
 
     L = zeros(dev, T, (grid.nkr, grid.nl, 4))
-    D = @. - params.ν * grid.kr^(2*params.nν)
+    D = @. - params.ν * grid.Krsq^(wolfparams.nν)
 
     L[:,:, 1] .= D # for ζt equation
     L[:,:, 2] .= D # for uc equation
@@ -304,15 +330,40 @@ end
 #  return Σ
 #end
 
+function baroclinic_energy(sol, grid)
+    uch = @views sol[:,:,2]
+    vch = @views sol[:,:,3]
+    pch = @views sol[:,:,4]
+    return (parsevalsum2(uch, grid) + parsevalsum2(vch, grid), parsevalsum2(pch, grid))
+end
+
 function baroclinic_energy(prob)
-    uch = @views prob.sol[:,:,2]
-    vch = @views prob.sol[:,:,3]
-    pch = @views prob.sol[:,:,4]
-    return parsevalsum2(uch, prob.grid) + parsevalsum2(vch, prob.grid) + parsevalsum2(pch, prob.grid)
+    return baroclinic_energy(prob.sol, prob.grid)
 end
 
 function barotropic_energy(prob)
-    ζth = @views prob.sol[:,:,1]
-    return parsevalsum2(sqrt.(prob.grid.invKrsq) .* ζth, prob.grid)
+    return barotropic_energy(prob.sol, prob.grid)
 end
+
+function barotropic_energy(sol, grid)
+    ζth = @views sol[:,:,1]
+    return parsevalsum2(sqrt.(grid.invKrsq) .* ζth, grid)
+end
+
+function wave_geostrophic_energy(prob)
+    return wave_geostrophic_energy(prob.sol, prob.grid)
+end
+
+function wave_geostrophic_energy(sol, grid)
+    Gh, Wh = decompose_balanced_wave(sol, grid)
+    uwh = @views Wh[:,:,1]
+    vwh = @views Wh[:,:,2]
+    pwh = @views Wh[:,:,3]
+
+    ugh = @views Gh[:,:,1]
+    vgh = @views Gh[:,:,2]
+    pgh = @views Gh[:,:,3]
+    return ((parsevalsum2(uwh, grid) + parsevalsum2(vwh, grid), parsevalsum2(pwh, grid)), (parsevalsum2(ugh, grid) + parsevalsum2(vgh, grid), parsevalsum2(pgh, grid)))
+end
+
 end

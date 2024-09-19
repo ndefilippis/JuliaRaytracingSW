@@ -36,18 +36,17 @@ function compute_wave_bases(grid)
     return (Φ₊, Φ₋)
 end
 
-function decompose_balanced_wave2(solution, grid)
-    baroclinic_components = solution[:,:,2:4]
-    uc = baroclinic_components[:,:,1]
-    vc = baroclinic_components[:,:,2] 
+function decompose_balanced_wave(solution, grid, wave_geo_bases)
+    baroclinic_components = @views solution[:,:,2:4]
+    Φ₀, Φ₊, Φ₋ = wave_geo_bases
+    Gh = sum(baroclinic_components .* conj(Φ₀), dims=3) .* Φ₀
+    Wh = sum(baroclinic_components .* conj(Φ₊), dims=3) .* Φ₊ + sum(baroclinic_components .* conj(Φ₋), dims=3) .* Φ₋
+    return (Gh, Wh)
 end
 
 function decompose_balanced_wave(solution, grid)
     Φ₀ = compute_balanced_basis(grid)
     Φ₊, Φ₋ = compute_wave_bases(grid)
-    baroclinic_components = solution[:,:,2:4]
-    Gh = sum(baroclinic_components .* conj(Φ₀), dims=3) .* Φ₀
-    Wh = sum(baroclinic_components .* conj(Φ₊), dims=3) .* Φ₊ + sum(baroclinic_components .* conj(Φ₋), dims=3) .* Φ₋
-    return (Gh, Wh)
+    return decompose_balanced_wave(solution, grid, (Φ₀, Φ₊, Φ₋))
 end
 end

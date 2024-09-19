@@ -23,7 +23,7 @@ end
 
 # Integrator parameters
 stepper = "FilteredRK4"
-nsteps = 100000
+nsteps = 500000
 nx = 512 # number of grid points
 device = GPU()
 

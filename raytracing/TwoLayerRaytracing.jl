@@ -4,9 +4,6 @@ using JLD2;
 using UnPack;
 using LinearAlgebra: ldiv!
 
-include("Parameters.jl");
-include("Raytracing.jl");
-
 import .Parameters;
 import .Raytracing;
 
@@ -67,7 +64,7 @@ function get_rms_U(velocity_info::Raytracing.Velocity)
     return sqrt(sum(velocity_info.u.^2 + velocity_info.v.^2)/nx/ny);
 end
 
-function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetSpinUpDelay, packet_params)
+function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, base_filename, packetSpinUpDelay, packet_params)
     # Set up memory constructs
     u1_background  = Array{Float64}(undef, grid.nx, grid.ny)
     v1_background  = Array{Float64}(undef, grid.nx, grid.ny)
@@ -94,13 +91,23 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
     @devzeros Dev Float64 (grid.nx, grid.ny) temp_device_out_field
     
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
+
+    file_index = 0
+    current_writes = 1
+    get_filename(file_index) = @sprintf("%s.%08d", base_filename, file_index)
+    max_writes = Parameters.max_writes
+
+    filename = get_filename(file_index)
+    if isfile(filename); rm(filename); end
+    out = jldopen(filename, "w")
     
     savepackets!(out, clock, packets)
     startwalltime = time()
     frames = 0:round(Int, nsteps / npacketsubs)
 	packet_frames = 1:round(Int, npacketsubs / nsubs)
-	
+
 	get_sol(prob) = prob.vars.ψh
+
     for j=frames
         if j % (100 / nsubs) == 0
             cfl = clock.dt * maximum([maximum(vars.u) / grid.dx, maximum(vars.v) / grid.dy])
@@ -118,10 +125,11 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
         old_t = clock.t
         
 		for k=packet_frames
+            # Steady background flow
 	        stepforward!(prob, [], nsubs);
             MultiLayerQG.updatevars!(prob);
 
-            get_velocity_info(get_background_u(prob), grid, packet_params, new_velocity, new_grad_v, temp_device_in_field, temp_device_out_field);
+             get_velocity_info(get_background_u(prob), grid, packet_params, new_velocity, new_grad_v, temp_device_in_field, temp_device_out_field);
             new_t = clock.t;
 
             Raytracing.solve!(old_velocity, new_velocity, old_grad_v, new_grad_v, grid.x, grid.y, packet_params.Npackets, packets, packet_params.dt, (packet_params.packetVelocityScale * old_t, packet_params.packetVelocityScale * new_t), packet_params);
@@ -135,9 +143,20 @@ function simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, packetS
             old_velocity = new_velocity;
             old_grad_v = new_grad_v;
             old_t = new_t;
+            clock.step += 1
         end
+        clock.step += 1
         savepackets!(out, clock, packets); # Save with latest velocity information
+        current_writes += 1
+        if current_writes >= max_writes
+            close(out)
+            current_writes = 0
+            file_index += 1
+            filename = get_filename(file_index)
+            out = jldopen(filename, "w")
+        end
     end 
+    close(out)
 end
 
 function set_up_problem(filename, stepper, dev)
@@ -177,11 +196,12 @@ function start!()
 	H = 1
 
 
-    filename = joinpath(Parameters.filepath, Parameters.filename)
-    if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
-    if isfile(filename); rm(filename); end
     
-    out = jldopen(filename, "w")
+    base_filename = joinpath(Parameters.filepath, Parameters.filename)
+    if !isdir(Parameters.filepath); mkdir(Parameters.filepath); end
+    #if isfile(filename); rm(filename); end
+    
+    #out = jldopen(filename, "w")
 
     # set_initial_condition!(dev, grid, prob, Parameters.q0_amplitude, nlayers);
     Npackets = Parameters.Npackets
@@ -197,6 +217,5 @@ function start!()
     rms_U = sqrt(sum(vars.u[:,:,1].^2 + vars.v[:,:,1].^2)/nx^2)
     packetVelocityScale = 1 # Parameters.initialFroudeNumber * Cg / rms_U
     packet_params = (f = f, Cg = Cg / packetVelocityScale, dt = dt / Parameters.packetStepsPerBackgroundStep, Npackets = Npackets, packetVelocityScale = packetVelocityScale, k0=k0);
-    simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, out, Parameters.packetSpinUpDelay, packet_params);
-    close(out)
+    simulate!(nsteps, nsubs, npacketsubs, grid, prob, packets, base_filename, Parameters.packetSpinUpDelay, packet_params);
 end

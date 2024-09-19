@@ -1,5 +1,4 @@
 using GeophysicalFlows, CairoMakie, Printf;
-using CUDA_Driver_jll, CUDA_Runtime_jll, GPUCompiler
 using Random: seed!
 
 import .Parameters
@@ -49,9 +48,9 @@ function start!()
 
 
     # Create Diagnostics -- `energies` function is imported at the top.
-    radialE = Diagnostic(modal_energy, prob; nsteps)
+    # radialE = Diagnostic(modal_energy, prob; nsteps)
     E = Diagnostic(MultiLayerQG.energies, prob; nsteps)
-    diags = [E, radialE]
+    diags = [E]
 
     filepath = Parameters.filepath
     filename = joinpath(filepath, Parameters.output_filename)
@@ -129,6 +128,10 @@ function start!()
       stepforward!(prob, diags, nsubs)
       MultiLayerQG.updatevars!(prob)
       saveoutput(out);
+    end
+    
+    for diag in diags
+        savediagnostic(diag, "energy", "diagnostic_file.jld2")
     end
     
     snapshot_filename = joinpath(filepath, Parameters.snapshot_filename)

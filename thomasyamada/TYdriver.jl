@@ -8,8 +8,8 @@ using FourierFlows
 using FourierFlows: parsevalsum2
 
 using Random: seed!
-using CairoMakie
 using Printf
+using JLD2
 using .ThomasYamada
 using .TYUtils
 import .Parameters
@@ -25,7 +25,14 @@ function kinetic_energy_spectrum(solution, grid)
     return (KEtr, KEgr, KEwr)
 end
 
-function set_initial_condition(prob; k0w_range=(0, 1), k0g_range=(0, 1), Et=0.0, Eg=0.0, Ew=0.0)
+function set_initial_condition_from_file(prob, restart_file, snapshot_key)
+    file = jldopen(restart_file)
+    sol = file[snapshot_key]
+    close(file)
+    set_solution!(prob, sol[:,:,1], sol[:,:,2], sol[:,:,3], sol[:,:,4])
+end
+
+function set_initial_condition(prob; k0w_range=(0, 1), k0g_range=(0, 1), at=0.0, ag=0.0, aw=0.0)
     grid = prob.grid
     dev = grid.device
     seed!(5678)
@@ -56,22 +63,24 @@ function set_initial_condition(prob; k0w_range=(0, 1), k0g_range=(0, 1), Et=0.0,
     uwh = (Φ₊[:,:,1] .* ϕ₊ + Φ₋[:,:,1] .* ϕ₋) .* wave_filter
     vwh = (Φ₊[:,:,2] .* ϕ₊ + Φ₋[:,:,2] .* ϕ₋) .* wave_filter
     pwh = (Φ₊[:,:,3] .* ϕ₊ + Φ₋[:,:,3] .* ϕ₋) .* wave_filter
+
+    ψt = irfft(ψth, grid.nx, (1, 2))
+    pg = irfft(pgh, grid.nx, (1, 2))
+    pw = irfft(pwh, grid.nx, (1, 2))
     
-    btE = parsevalsum2(sqrt.(grid.Krsq) .* ψth, grid)
+    max_ψt = maximum(abs.(ψt))
+    max_pg = maximum(abs.(pg))
+    max_pw = maximum(abs.(pw))
+
+    @. ψth = ψth * at / max_ψt
     
-    gE  = parsevalsum2(ugh, grid) + parsevalsum2(vgh, grid) + parsevalsum2(pgh, grid)
-    wE  = parsevalsum2(uwh, grid) + parsevalsum2(vwh, grid) + parsevalsum2(pwh, grid)
+    @. ugh = ugh * ag / max_pg
+    @. vgh = vgh * ag / max_pg
+    @. pgh = pgh * ag / max_pg
     
-    @. ψth = ψth * sqrt(Et / btE)
-    
-    
-    @. ugh = ugh * sqrt(Eg / gE)
-    @. vgh = vgh * sqrt(Eg / gE)
-    @. pgh = pgh * sqrt(Eg / gE)
-    
-    @. uwh = uwh * sqrt(Ew / wE)
-    @. vwh = vwh * sqrt(Ew / wE)
-    @. pwh = pwh * sqrt(Ew / wE)
+    @. uwh = uwh * aw / max_pw
+    @. vwh = vwh * aw / max_pw
+    @. pwh = pwh * aw / max_pw
 
     ζ₀h = @. - grid.Krsq * ψth
     u₀h = uwh + ugh
@@ -100,6 +109,8 @@ function create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
 end
 
 function start!()
+    startup_nsteps = Parameters.startup_nsteps
+    startup_nsubs = Parameters.startup_nsubs
     nsteps = Parameters.nsteps
     nsubs = Parameters.nsubs
    
@@ -108,7 +119,66 @@ function start!()
 		println("Executing on the GPU...")
         dev = GPU() 
     end
-    prob = Problem(dev;
+    startup_prob = Problem(dev;
+		Lx = Parameters.Lx, 
+        nx = Parameters.nx,
+        ν  = Parameters.ν,
+        nν = Parameters.nν,
+        Ro = Parameters.Ro,
+        stepper = Parameters.stepper,
+        dt = Parameters.startup_dt)
+    
+    sol, clock, params, vars, grid = startup_prob.sol, startup_prob.clock, startup_prob.params, startup_prob.vars, startup_prob.grid
+    x, y = grid.x, grid.y
+
+    if (length(ARGS) >= 2)
+        set_initial_condition_from_file(startup_prob, Parameters.restart_file, Parameters.restart_frame)
+    else
+        set_initial_condition(startup_prob; k0g_range=Parameters.k0g_range, k0w_range=Parameters.k0w_range, 
+            at=Parameters.at, ag=Parameters.ag, aw=Parameters.aw)
+    end
+
+    filepath = "."
+    file_index = 0
+    base_filename = joinpath(filepath, Parameters.filename)
+    get_filename(file_index) = @sprintf("%s.%08d", base_filename, file_index)
+    max_writes = Parameters.max_writes
+
+    filename = get_filename(file_index)
+    if isfile(filename); rm(filename); end
+    
+    get_sol(prob) = Array(prob.sol)
+    
+    wave_geo_E = Diagnostic(wave_geostrophic_energy, startup_prob; nsteps=startup_nsteps, freq=25)
+    btE = Diagnostic(barotropic_energy, startup_prob; nsteps=startup_nsteps, freq=25)
+    diags = [wave_geo_E, btE]
+
+    out = Output(startup_prob, "startup", (:sol, get_sol))
+    startwalltime = time()
+    updatevars!(startup_prob)
+    saveproblem(out)
+    saveoutput(out)
+    current_writes = 1
+
+    startup_frames=0:round(Int, startup_nsteps / startup_nsubs)
+    for j=startup_frames
+        if j % (4000 / startup_nsubs) == 0
+            max_udx = maximum([maximum(vars.uc) / grid.dx, maximum(vars.vc) / grid.dy, maximum(vars.ut) / grid.dx, maximum(vars.vt) / grid.dy])
+            cfl = clock.dt * max_udx
+            log = @sprintf("step %04d, t:%.1f, cfl: %.4f, walltime: %.2f min", clock.step, clock.t, cfl, (time()-startwalltime)/60)
+            println(log)
+			flush(stdout)
+        end
+        stepforward!(startup_prob, diags, startup_nsubs)
+        enforce_reality_condition!(startup_prob)
+        updatevars!(startup_prob)
+    end
+    savediagnostic(btE, "barotropic_energy", "startup_diagnostics.jld2")
+    savediagnostic(wave_geo_E, "wave_geostrophic_energy", "startup_diagnostics.jld2")
+    saveoutput(out)
+    println("Startup finished")
+
+    prob = Problem(CPU();
 		Lx = Parameters.Lx, 
         nx = Parameters.nx,
         ν  = Parameters.ν,
@@ -116,37 +186,25 @@ function start!()
         Ro = Parameters.Ro,
         stepper = Parameters.stepper,
         dt = Parameters.dt)
+
+    prob.clock.t = startup_prob.clock.t
+    set_solution!(prob, startup_prob.sol[:,:,1], startup_prob.sol[:,:,2], startup_prob.sol[:,:,3], startup_prob.sol[:,:,4])
+
+    startup_prob = nothing
+    wave_geo_E = Diagnostic(wave_geostrophic_energy, prob; nsteps=startup_nsteps, freq=25)
+    btE = Diagnostic(barotropic_energy, prob; nsteps=startup_nsteps, freq=25)
+    diags = [wave_geo_E, btE]
     
     sol, clock, params, vars, grid = prob.sol, prob.clock, prob.params, prob.vars, prob.grid
     x, y = grid.x, grid.y
 
-    set_initial_condition(prob; k0g_range=Parameters.k0g_range, k0w_range=Parameters.k0w_range, Et=Parameters.Et, Eg=Parameters.Eg, Ew=Parameters.Ew)
-
-    filepath = "."
-    filename = joinpath(filepath, Parameters.filename)
-    if isfile(filename); rm(filename); end
-    
-    get_sol(prob) = Array(prob.sol)
-    
-    bcE = Diagnostic(baroclinic_energy, prob; nsteps)
-    btE = Diagnostic(barotropic_energy, prob; nsteps)
-    diags = [bcE, btE]
-
-    out = Output(prob, filename, (:sol, get_sol), (:bcE, bcE), (:btE, btE))
-    # ζt = Observable(Array(vars.ζt))
-    # qc = Observable(Array(vars.qc))
-    # solution = Observable(Array(sol))
-    # baroclinic = Observable(Point2f[(bcE.t[1], bcE.data[1])])
-    # barotropic = Observable(Point2f[(btE.t[1], btE.data[1])])
-
-    # fig = create_figure(prob, ζt, qc, sol, baroclinic, barotropic)
-
-    startwalltime = time()
-    frames = 0:round(Int, nsteps / nsubs)
-
+    out = Output(prob, filename, (:sol, get_sol))
     updatevars!(prob)
     saveproblem(out)
     saveoutput(out)
+
+    frames = 0:round(Int, nsteps / nsubs)
+    
     for j=frames
     	# record(fig, "thomas_yamada.mp4", frames, framerate = 18) do j
         if j % (1000 / nsubs) == 0
@@ -156,15 +214,20 @@ function start!()
             println(log)
 			flush(stdout)	
         end
-        # ζt[] = vars.ζt
-        # qc[] = vars.qc
-        # baroclinic[] = push!(baroclinic[], Point2f(bcE.t[bcE.i], bcE.data[bcE.i][1]))
-        # barotropic[] = push!(barotropic[], Point2f(btE.t[btE.i], btE.data[btE.i][1]))
-        # solution[] = sol
         stepforward!(prob, diags, nsubs)
+        enforce_reality_condition!(prob)
         updatevars!(prob)
         saveoutput(out)
+        current_writes += 1
+        if current_writes >= max_writes
+            current_writes = 0
+            file_index += 1
+            filename = get_filename(file_index)
+            out = Output(prob, filename, (:sol, get_sol))
+        end
     end
+    savediagnostic(btE, "barotropic_energy", "diagnostics.jld2")
+    savediagnostic(wave_geo_E, "baroclinic_energy", "diagnostics.jld2")
 end
 
 start!()

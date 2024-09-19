@@ -1,6 +1,6 @@
 module Raytracing
 using Interpolations;
-using DifferentialEquations;
+using OrdinaryDiffEq;
 
 struct Wavepacket
     x::Vector{Float64}
@@ -9,8 +9,8 @@ struct Wavepacket
 end
 
 struct Velocity
-    u::Array{Float64, 2}
-    v::Array{Float64, 2}
+    u::AbstractArray{2}
+    v::AbstractArray{2}
 end
 
 struct VelocityInterpolator
@@ -19,10 +19,10 @@ struct VelocityInterpolator
 end
 
 struct VelocityGradient
-    ux::Array{Float64, 2}
-    uy::Array{Float64, 2}
-    vx::Array{Float64, 2}
-    vy::Array{Float64, 2}
+    ux::AbstractArray{2}
+    uy::AbstractArray{2}
+    vx::AbstractArray{2}
+    vy::AbstractArray{2}
 end
 
 struct VelocityGradientInterpolator
