@@ -224,25 +224,25 @@ function Lop_kernel(result, k, l, Nx, Ny, D, f, Cg2)
     if i > Nx || j > Ny
         return
     end
-    result[i, j, 1, 1] = -D[i,j]
+    result[i, j, 1, 1] = D[i,j]
     result[i, j, 1, 2] =  f
     result[i, j, 1, 3] = -1im*k[i]*Cg2
 
     result[i, j, 2, 1] = -f
-    result[i, j, 2, 2] = -D[i,j]
+    result[i, j, 2, 2] = D[i,j]
     result[i, j, 2, 3] = -1im*l[j]*Cg2
 
     result[i, j, 3, 1] = -1im*k[i]
     result[i, j, 3, 2] = -1im*l[j]
-    result[i, j, 3, 3] = -D[i,j]
+    result[i, j, 3, 3] = D[i,j]
     return
 end
 
 function populate_L!(L, grid, params, dev::CPU)
     D = @. - params.ν * grid.Krsq^(params.nν)
-    Lop(k, l, i, j) = [-D[i,j]          params.f  -1im*k*params.Cg2;
-                 -params.f  -D[i,j]         -1im*l*params.Cg2;
-                 -1im*k     -1im*l     -D[i,j]]
+    Lop(k, l, i, j) = [D[i,j]          params.f  -1im*k*params.Cg2;
+                 -params.f  D[i,j]         -1im*l*params.Cg2;
+                 -1im*k     -1im*l     D[i,j]]
     for i=1:grid.nkr
         for j=1:grid.nl
             k = grid.kr[i]
@@ -309,5 +309,22 @@ function energy(u, v, η, Cg2)
     KE = 0.5 * sum(@. (1 + η) * (u^2 + v^2))
     PE = 0.5 * Cg2 * sum(@. (1 + η)^2 - 1)
     return (KE, PE)
+end
+
+function wave_balanced_decomposition(prob)
+
+end
+
+function wave_balanced_decomposition(uh, vh, ηh, grid, params)
+    Kd2 = params.f^2/params.Cg2
+    qh = @. 1im * grid.kr * vh - 1im * grid.l * uh - params.f * ηh
+    ψh = -qh / (grid.Krsq + Kd2)
+    ugh = -1im * grid.l  .* ψh
+    vgh =  1im * grid.kr .* ψh
+    ηgh = params.f/params.Cg2 * ψh
+    uwh = uh - ugh
+    vwh = vh - vgh
+    ηwh = ηh - ηgh
+    return ((ugh, vgh, ηgh), (uwh, vwh, ηwh))
 end
 end

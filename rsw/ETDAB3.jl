@@ -1,5 +1,5 @@
-module IFMAB3
-export IFMAB3TimeStepper, stepforward!
+module ETDAB3
+export ETDAB3TimeStepper, stepforward!
 
 using FourierFlows, CUDA, StaticArrays
 
