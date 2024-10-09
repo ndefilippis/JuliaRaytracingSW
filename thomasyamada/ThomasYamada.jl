@@ -279,7 +279,7 @@ function Equation(params, grid)
     dev = grid.device
 
     L = zeros(dev, T, (grid.nkr, grid.nl, 4))
-    D = @. - params.ν * grid.Krsq^(wolfparams.nν)
+    D = @. - params.ν * grid.Krsq^(params.nν)
 
     L[:,:, 1] .= D # for ζt equation
     L[:,:, 2] .= D # for uc equation

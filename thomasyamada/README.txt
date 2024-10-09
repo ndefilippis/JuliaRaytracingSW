@@ -1,1 +1,1 @@
-Fourier analysis for small Rossby number, no waves
+Thomas yamada job with U normalization

@@ -4,7 +4,8 @@ export
   set_solution!,
   enforce_reality_condition!,
   updatevars!,
-  energy
+  energy,
+  wave_balanced_decomposition
 
 using FourierFlows
 using FourierFlows: parsevalsum2
@@ -31,6 +32,18 @@ struct Vars{Aphys, Atrans} <: AbstractVars
     ζh  :: Atrans
 end
 
+struct StochasticVars{Aphys, Atrans} <: AbstractVars
+    u  :: Aphys
+    v  :: Aphys
+    η  :: Aphys
+    ζ  :: Aphys
+    vh  :: Atrans
+    uh  :: Atrans
+    ηh  :: Atrans
+    ζh  :: Atrans
+    Fh  :: Atrans
+end
+
 function Vars(grid)
   Dev = typeof(grid.device)
   T = eltype(grid)
@@ -40,6 +53,18 @@ function Vars(grid)
 
   return Vars(u, v, η, ζ, uh, vh, ηh, ζh)
 end
+
+function StochasticVars(grid)
+  Dev = typeof(grid.device)
+  T = eltype(grid)
+
+  @devzeros Dev T (grid.nx, grid.ny) u v η ζ
+  @devzeros Dev Complex{T} (grid.nkr, grid.nl) uh vh ηh ζh Fh
+
+  return StochasticVars(u, v, η, ζ, uh, vh, ηh, ζh, Fh)
+end
+
+nothingfunction(args...) = nothing
 
 function Problem(dev::Device = CPU();
     nx = 128,
@@ -52,20 +77,23 @@ function Problem(dev::Device = CPU();
     Cg = 1.0,
     stepper = "IFMAB3",
     dt = 5e-2,
+    calcF! = nothingfunction,
     aliased_fraction = 1/3,
-    T = Float64)
+    T = Float64,
+    use_filter=false,
+    stepper_kwargs...)
    
     grid = TwoDGrid(dev; nx, Lx, ny, Ly, aliased_fraction, T)
     params = Params{T}(ν, nν, f, Cg^2)
-    vars = Vars(grid)
+    vars = calcF! == nothingfunction ? Vars(grid) : StochasticVars(grid)
     equation = Equation(params, grid)
     if stepper == "IFMAB3"
         clock = FourierFlows.Clock{T}(dt, 0, 0)
-        timestepper = IFMAB3TimeStepper(equation, dt, dev)
+        timestepper = IFMAB3TimeStepper(equation, dt, dev; use_filter, stepper_kwargs...)
         sol = zeros(dev, equation.T, equation.dims)
         return FourierFlows.Problem(sol, clock, equation, grid, vars, params, timestepper)
     else
-        return FourierFlows.Problem(equation, stepper, dt, grid, vars, params)
+        return FourierFlows.Problem(equation, stepper, dt, grid, vars, params, stepper_kwargs...)
     end
 end
 
@@ -118,26 +146,6 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     @. vars.uh = @view sol[:,:,1]
     @. vars.vh = @view sol[:,:,2]
     @. vars.ηh = @view sol[:,:,3]
-
-    # Calculate linear dynamics
-    #@. uhN =  params.f * vars.vh
-    #@. vhN = -params.f * vars.uh
-    
-    #ηxh = vars.ζh
-    #@. ηxh = 1im * grid.kr * vars.ηh
-    #@. uhN += -params.Cg2 * ηxh
-    
-    #ηyh = vars.ζh
-    #@. ηyh = 1im * grid.l * vars.ηh
-    #@. vhN += -params.Cg2 * ηyh
-
-    #uxh = vars.ζh
-    #@. uxh = 1im * grid.kr * vars.uh
-    #@. ηhN  = -uxh
-
-    #vyh = vars.ζh
-    #@. vyh = 1im * grid.l  * vars.vh
-    #@. ηhN += -vyh
     
     # Calculate advective terms
     # Compute real-space u
@@ -215,7 +223,19 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     @. ηvy = vars.v .* vars.η
     mul!(ηvyh, grid.rfftplan, ηvy)
     @. ηhN += -1im * grid.l * ηvyh
+
+    addforcing!(N, sol, t, clock, vars, params, grid)
     return nothing
+end
+
+addforcing!(N, sol, t, clock, vars::Vars, params, grid) = nothing
+
+function addforcing!(N, sol, t, clock, vars::StochasticVars, params, grid)
+  params.calcF!(vars.Fh, sol, t, clock, vars, params, grid)
+  
+  @. N += vars.Fh
+  
+  return nothing
 end
 
 function Lop_kernel(result, k, l, Nx, Ny, D, f, Cg2)
@@ -312,13 +332,13 @@ function energy(u, v, η, Cg2)
 end
 
 function wave_balanced_decomposition(prob)
-
+    return wave_balanced_decomposition(prob.vars.uh, prob.vars.vh, prob.vars.ηh, prob.grid, prob.params)
 end
 
 function wave_balanced_decomposition(uh, vh, ηh, grid, params)
     Kd2 = params.f^2/params.Cg2
     qh = @. 1im * grid.kr * vh - 1im * grid.l * uh - params.f * ηh
-    ψh = -qh / (grid.Krsq + Kd2)
+    ψh = @. -qh / (grid.Krsq + Kd2)
     ugh = -1im * grid.l  .* ψh
     vgh =  1im * grid.kr .* ψh
     ηgh = params.f/params.Cg2 * ψh

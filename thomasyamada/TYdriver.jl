@@ -65,22 +65,22 @@ function set_initial_condition(prob; k0w_range=(0, 1), k0g_range=(0, 1), at=0.0,
     pwh = (Φ₊[:,:,3] .* ϕ₊ + Φ₋[:,:,3] .* ϕ₋) .* wave_filter
 
     ψt = irfft(ψth, grid.nx, (1, 2))
-    pg = irfft(pgh, grid.nx, (1, 2))
-    pw = irfft(pwh, grid.nx, (1, 2))
+    ug = irfft(ugh, grid.nx, (1, 2))
+    uw = irfft(uwh, grid.nx, (1, 2))
     
     max_ψt = maximum(abs.(ψt))
-    max_pg = maximum(abs.(pg))
-    max_pw = maximum(abs.(pw))
+    max_ug = maximum(abs.(ug))
+    max_uw = maximum(abs.(uw))
 
     @. ψth = ψth * at / max_ψt
     
-    @. ugh = ugh * ag / max_pg
-    @. vgh = vgh * ag / max_pg
-    @. pgh = pgh * ag / max_pg
+    @. ugh = ugh * ag / max_ug
+    @. vgh = vgh * ag / max_ug
+    @. pgh = pgh * ag / max_ug
     
-    @. uwh = uwh * aw / max_pw
-    @. vwh = vwh * aw / max_pw
-    @. pwh = pwh * aw / max_pw
+    @. uwh = uwh * aw / max_uw
+    @. vwh = vwh * aw / max_uw
+    @. pwh = pwh * aw / max_uw
 
     ζ₀h = @. - grid.Krsq * ψth
     u₀h = uwh + ugh
