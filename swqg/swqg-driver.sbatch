@@ -12,9 +12,9 @@ module purge
 
 export NUM_JULIA_THREADS=`nproc`
 
-rundir=$SCRATCH/rsw/$SLURM_JOB_ID
+rundir=$SCRATCH/swqg/$SLURM_JOB_ID
 mkdir -p $rundir
-cp swqg-driver.sbatch SWQG.jl SWQGDriver.jl SWQGMain.jl $rundir
+cp swqg-driver.sbatch SWQG.jl SWQGDriver.jl SWQGMain.jl README.txt $rundir
 cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir
 cp SWQGParameters.jl $rundir/Parameters.jl
 cd $rundir

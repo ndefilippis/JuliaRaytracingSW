@@ -14,7 +14,8 @@ export NUM_JULIA_THREADS=`nproc`
 
 rundir=$SCRATCH/rsw/$SLURM_JOB_ID
 mkdir -p $rundir
-cp driver.sbatch Parameters.jl RotatingShallowWater.jl RSWDriver.jl RSWMain.jl SequencedOutputs.jl IFMAB3.jl $rundir
+cp rsw-driver.sbatch RotatingShallowWater.jl RSWDriver.jl RSWMain.jl README.txt $rundir
+cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir
 cp RSWParameters.jl $rundir/Parameters.jl
 cd $rundir
 

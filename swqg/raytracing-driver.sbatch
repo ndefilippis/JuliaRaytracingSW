@@ -12,14 +12,14 @@ module purge
 
 export NUM_JULIA_THREADS=`nproc`
 
-rundir=$SCRATCH/rsw/$SLURM_JOB_ID
+rundir=$SCRATCH/swqg_rays/$SLURM_JOB_ID
 mkdir -p $rundir
-cp raytracing-driver.sbatch SWQG.jl RaytracingDriver.jl RaytracingMain.jl $rundir
+cp raytracing-driver.sbatch SWQG.jl RaytracingDriver.jl RaytracingMain.jl README.txt $rundir
 cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir
 cp ../raytracing/GPURaytracing.jl $rundir
 cp RaytracingParameters.jl $rundir/Parameters.jl
 cd $rundir
 
-julia -t $SLURM_CPUS_PER_TASK RSWMain.jl > run.log
+julia -t $SLURM_CPUS_PER_TASK RaytracingMain.jl > run.log
 
 exit

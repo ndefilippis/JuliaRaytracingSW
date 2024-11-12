@@ -85,6 +85,14 @@ function initialize_problem()
     return prob, nsteps, spinup_step, output_per_packet_freq, packet_output_freq, diags_freq
 end
 
+function savepacketproblem!(out, params)
+    out["params/f0"] = params.f
+    out["params/Cg"] = params.Cg
+    out["params/dt"] = params.dt
+    out["params/N"] = params.Npackets
+    out["params/k0"] = params.k0
+end
+
 function savepackets!(out, clock, pos, wavenumber, velocity)
     out["p/t/$(clock.step)"] = clock.t
     out["p/x/$(clock.step)"] = Array(pos);
@@ -132,7 +140,7 @@ function start!()
 
     # Create initial packets
     Npackets = Parameters.Npackets
-    k0 = sqrt(Parameters.ω0^2 - 1) * Parameters.f / Parameters.Cg
+    k0 = sqrt((Parameters.ω0 / Parameters.f)^2 - 1) * Parameters.f / Parameters.Cg
     packets = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
     packet_params = (f = Parameters.f, Cg = Parameters.Cg, dt = clock.dt, Npackets = Npackets, k0=k0);
 
@@ -186,6 +194,7 @@ function start!()
 
     SequencedOutputs.saveproblem(output)
     SequencedOutputs.saveoutput(output)
+    savepacketproblem!(packet_output, packet_params);
     savepackets!(packet_output, clock, packet_pos, packet_K, packet_U); # Save with latest velocity information
     
     startwalltime = time()
@@ -194,7 +203,7 @@ function start!()
     ode_template = create_template_ode(packets)
 
     for step=frames
-        if (step % (800 / packet_output_freq) == 0)
+        if (step % 1500 == 0)
             max_udx = max(maximum(abs.(vars.u)) / grid.dx, maximum(abs.(vars.v)) / grid.dy)
             cfl = clock.dt * max_udx
             println(@sprintf("step: %04d, t: %.2f, cfl: %.2e, time: %.2f mins", clock.step, clock.t, cfl, (time() - startwalltime) / 60))
@@ -203,7 +212,7 @@ function start!()
 
 		old_t = clock.t
         if (clock.step < spinup_step)
-            SWQG.stepforward(prob, diags, packet_output_freq * output_per_packet_freq)
+            SWQG.stepforward!(prob, diags, packet_output_freq * output_per_packet_freq)
             SWQG.updatevars!(prob)
             get_velocity_info(get_streamfunction(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
         else 
