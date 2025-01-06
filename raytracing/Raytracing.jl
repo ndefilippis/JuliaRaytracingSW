@@ -9,8 +9,8 @@ struct Wavepacket
 end
 
 struct Velocity
-    u::AbstractArray{2}
-    v::AbstractArray{2}
+    u::AbstractArray{Float64, 2}
+    v::AbstractArray{Float64, 2}
 end
 
 struct VelocityInterpolator
@@ -19,10 +19,10 @@ struct VelocityInterpolator
 end
 
 struct VelocityGradient
-    ux::AbstractArray{2}
-    uy::AbstractArray{2}
-    vx::AbstractArray{2}
-    vy::AbstractArray{2}
+    ux::AbstractArray{Float64, 2}
+    uy::AbstractArray{Float64, 2}
+    vx::AbstractArray{Float64, 2}
+    vy::AbstractArray{Float64, 2}
 end
 
 struct VelocityGradientInterpolator
@@ -106,7 +106,7 @@ function _solve!(Npackets::Int, wavepackets::AbstractVector{Wavepacket}, dt::Flo
     Threads.@threads for i=1:Npackets
 	#for i=1:Npackets
         problem = DynamicalODEProblem(dxdt, dkdt, wavepackets[i].x, wavepackets[i].k, tspan, params);
-        local sim = solve(problem, Tsit5(), dt=dt, save_on=false, save_start=false);
+        local sim = solve(problem, ImplicitMidpoint(), dt=dt, save_on=false, save_start=false);
         wavepackets[i].x[1] = sim[1,1];
 		wavepackets[i].x[2] = sim[2,1];
 		wavepackets[i].k[1] = sim[3,1];
@@ -155,7 +155,7 @@ function interpolator(field, x, y)
             scale(
                 interpolate(field, BSpline(Cubic(Periodic(OnCell())))), 
             x, y), 
-        Periodic());
+        Periodic(OnCell()));
 end
 
 function interpolator(field1::Array{Float64, 2}, field2::Array{Float64, 2}, x::AbstractRange{Float64}, y::AbstractRange{Float64}, tspan)
@@ -164,7 +164,7 @@ function interpolator(field1::Array{Float64, 2}, field2::Array{Float64, 2}, x::A
     return extrapolate(
             scale(
                 interpolate(field, 
-                    (BSpline(Quadratic(Periodic(OnCell()))), BSpline(Quadratic(Periodic(OnCell()))), BSpline(Linear()))),
+                    (BSpline(Quadratic(Periodic(OnGrid()))), BSpline(Quadratic(Periodic(OnGrid()))), BSpline(Linear()))),
             x, y, range(tspan[1], tspan[2], length=2)), 
           (Periodic(), Periodic(), Linear()));
 end

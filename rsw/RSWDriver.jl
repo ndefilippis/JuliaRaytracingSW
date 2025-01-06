@@ -20,8 +20,8 @@ function set_shafer_initial_condition!(prob, Kg, Kw, ag, aw, f, Cg2)
     sgn =  device_array(grid.device)(sign.(rand(grid.nkr, grid.nl) .- 0.5))
     shift = exp.(1im * phase)
     ηgh[geo_filter] += ( 0.5   * shift)[geo_filter]
-    ugh[geo_filter] += (-0.5im * Cg2 * f * grid.l  .* shift)[geo_filter]
-    vgh[geo_filter] += ( 0.5im * Cg2 * f * grid.kr .* shift)[geo_filter]
+    ugh[geo_filter] += (-0.5im * Cg2 / f * grid.l  .* shift)[geo_filter]
+    vgh[geo_filter] += ( 0.5im * Cg2 / f * grid.kr .* shift)[geo_filter]
 
     ldiv!(ug, grid.rfftplan, deepcopy(ugh))
     ηgh *= ag / maximum(abs.(ug))

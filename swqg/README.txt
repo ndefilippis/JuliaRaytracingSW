@@ -1,1 +1,1 @@
-Correct a mistake with the initial wavenumber
+Fine grained Fr simulations

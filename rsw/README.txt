@@ -1,1 +1,1 @@
-Shallow Water control runs with a larger Rayleigh frequency
+Testing No waves case and varying Fr

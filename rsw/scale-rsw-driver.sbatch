@@ -16,12 +16,8 @@ export NUM_JULIA_THREADS=`nproc`
 
 config=scale-parameters.txt
 
-Kg1=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $config)
-Kg2=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $3}' $config)
-ag=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $4}' $config)
-Kw1=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $5}' $config)
-Kw2=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $6}' $config)
-aw=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $7}' $config)
+aw=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $config)
+Cg=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $3}' $config)
 
 rundir=$SCRATCH/rsw/${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 
@@ -31,6 +27,6 @@ cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir
 cp ScaleParameters.jl $rundir/Parameters.jl
 cd $rundir
 
-julia -t $SLURM_CPUS_PER_TASK RSWMain.jl $Kg1 $Kg2 $ag $Kw1 $Kw2 $aw > run.log
+julia -t $SLURM_CPUS_PER_TASK RSWMain.jl $aw $Cg > run.log
 
 exit
