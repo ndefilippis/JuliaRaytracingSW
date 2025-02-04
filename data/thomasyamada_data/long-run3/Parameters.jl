@@ -1,1 +1,0 @@
-/scratch/nad9961/thomasyamada_simulation/47618625/Parameters.jl

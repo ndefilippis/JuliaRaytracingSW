@@ -1,7 +1,7 @@
 module GPURaytracing
 using CUDA, OrdinaryDiffEq
 
-export Velocity, VelocityGradient, raytrace!, interpolate_velocity!, create_template_ode
+export Velocity, VelocityGradient, raytrace!, interpolate_velocity!, interpolate_gradients!, create_template_ode
 
 struct Velocity
     u::CuArray{Float32, 2}
@@ -70,6 +70,34 @@ function interpolate_velocity!(velocity::Velocity, positions, grid, output_U, ou
 
     broadcast!(output_V, nx, ny, Ref(texV)) do xi, yi, V
         V[xi, yi]
+    end
+end
+
+function interpolate_gradients!(gradient::VelocityGradient, positions, grid, output_Ux, output_Uy, output_Vx, output_Vy)
+    texUx  = CuTexture(gradient.ux;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
+    texUy  = CuTexture(gradient.uy;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
+    texVx  = CuTexture(gradient.vx;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
+    texVy  = CuTexture(gradient.vy;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
+
+    x = @views positions[:, 1]
+    y = @views positions[:, 2]
+    nx = (x .- grid.x[1]) / grid.Lx
+    ny = (y .- grid.y[1]) / grid.Ly
+    
+    broadcast!(output_Ux, nx, ny, Ref(texUx)) do xi, yi, Ux
+        Ux[xi, yi]
+    end
+
+    broadcast!(output_Uy, nx, ny, Ref(texUy)) do xi, yi, Uy
+        Uy[xi, yi]
+    end
+
+    broadcast!(output_Vx, nx, ny, Ref(texVx)) do xi, yi, Vx
+        Vx[xi, yi]
+    end
+
+    broadcast!(output_Vy, nx, ny, Ref(texVy)) do xi, yi, Vy
+        Vy[xi, yi]
     end
 end
 

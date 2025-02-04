@@ -18,8 +18,8 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 2000.
-    T = 5000.
+    spinup_T = 100.
+    T = 200.
     output_dt = 1.0/f
     diag_dt = 0.5
 
@@ -32,6 +32,7 @@ module Parameters
 
     # Wavepackets output parameters
     packet_base_filename = "packets"
+    write_gradients = true
     packet_max_writes = 5000
     packet_output_dt = 0.2/f;
 

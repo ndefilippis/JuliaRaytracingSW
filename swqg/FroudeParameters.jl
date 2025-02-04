@@ -32,11 +32,12 @@ module Parameters
 
     # Wavepackets output parameters
     packet_base_filename = "packets"
+    write_gradients = true
     packet_max_writes = 5000
-    packet_output_dt = 2.0/f;
+    packet_output_dt = 0.2/f;
 
     # Wavepackets parameters
-    sqrtNpackets = 128; # Square root of the number of wavepackets;
+    sqrtNpackets = 10; # Square root of the number of wavepackets;
     Npackets = sqrtNpackets^2;
     ω0 = sqrt(f^2 + Cg^2 * parse(Float32, ARGS[2])^2); # How close to f the initial wavepacket frequencies are
     k_cutoff = 100*f/Cg # The wavenumber that we reset a off a wavepacket

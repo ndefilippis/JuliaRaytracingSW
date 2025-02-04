@@ -93,12 +93,34 @@ function savepacketproblem!(out, params)
     out["params/k0"] = params.k0
 end
 
-function savepackets!(out, clock, pos, wavenumber, velocity)
+function write_packets!(out, clock, pos, wavenumber, velocity)
     out["p/t/$(clock.step)"] = clock.t
     out["p/x/$(clock.step)"] = Array(pos);
     out["p/k/$(clock.step)"] = Array(wavenumber);
 	out["p/u/$(clock.step)"] = Array(velocity);
     return nothing;
+end
+
+function write_packets!(out, clock, pos, wavenumber, velocity, gradient)
+    write_packets!(out, clock, pos, wavenumber, velocity)
+    out["p/g/$(clock.step)"] = Array(gradient);
+    return nothing;
+end
+
+function savepacketdata!(out, clock, 
+    velocity, gradient, grid, 
+    output_u, output_v, 
+    output_ux, output_uy, output_vx, output_vy, 
+    packet_pos, packet_K, packet_U, packet_grad_U, write_gradients)
+    
+    interpolate_velocity!(velocity, packet_pos, grid, output_u, output_v)
+
+    if(write_gradients)
+        interpolate_gradients!(gradient, packet_pos, grid, output_ux, output_uy, output_vx, output_vy)
+        write_packets!(out, clock, packet_pos, packet_K, packet_U, packet_grad_U);
+    else
+        write_packets!(out, clock, packet_pos, packet_K, packet_U);
+    end
 end
 
 function savediagnostics(diagnostics, diagnostic_names)
@@ -144,7 +166,7 @@ function start!()
     packets = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
     packet_params = (f = Parameters.f, Cg = Parameters.Cg, dt = clock.dt, Npackets = Npackets, k0=k0);
 
-    # Create Output objjects
+    # Create Output objects
     filename_func(idx) = @sprintf("%s.%06d.jld2", Parameters.base_filename, idx)
     packet_filename_func(idx) = @sprintf("%s.%06d.jld2", Parameters.packet_base_filename, idx)
 
@@ -176,9 +198,15 @@ function start!()
     @devzeros Dev T (grid.nx, grid.ny) temp_device_out_field
 
     @devzeros Dev T (Parameters.Npackets, 2) packet_U
+    @devzeros Dev T (Parameters.Npackets, 4) packet_grad_U
     
     output_u = @views packet_U[:, 1]
     output_v = @views packet_U[:, 2]
+
+    output_ux = @views packet_grad_U[:, 1]
+    output_uy = @views packet_grad_U[:, 2]
+    output_vx = @views packet_grad_U[:, 3]
+    output_vy = @views packet_grad_U[:, 4]
     
     packet_pos = @views packets[:, 1:2]
 
@@ -187,20 +215,26 @@ function start!()
     
     packet_l = @views packets[:, 4]
     
+
 	get_streamfunction(prob) = prob.vars.ψh
     
     get_velocity_info(vars.ψh, grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
-    interpolate_velocity!(old_velocity, packet_pos, grid, output_u, output_v) 
+    
 
+    # Initial state
     SequencedOutputs.saveproblem(output)
     SequencedOutputs.saveoutput(output)
     savepacketproblem!(packet_output, packet_params);
-    savepackets!(packet_output, clock, packet_pos, packet_K, packet_U); # Save with latest velocity information
+
+    savepacketdata!(packet_output, clock,
+        old_velocity, old_grad_v, grid,
+        output_u, output_v, output_ux, output_uy, output_vx, output_vy,
+        packet_pos, packet_K, packet_U, packet_grad_U, Parameters.write_gradients)
     
     startwalltime = time()
     frames = 0:round(Int, nsteps / packet_output_freq)
 	packet_frames = 1:round(Int, packet_output_freq)
-    ode_template = create_template_ode(packets)
+    ode_template = create_template_ode(packets) # ODE solver acceleration structure
 
     for step=frames
         if (step % 1500 == 0)
@@ -217,7 +251,6 @@ function start!()
             get_velocity_info(get_streamfunction(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
         else 
     		for packet_step=packet_frames
-                # Steady background flow
     	        SWQG.stepforward!(prob, diags, 1);
                 
                 SWQG.updatevars!(prob);
@@ -234,10 +267,12 @@ function start!()
             packet_k[mask] .= packet_params.k0
             packet_l[mask] .= 0
     
-            # Update velocity info
-            interpolate_velocity!(new_velocity, packet_pos, grid, output_u, output_v)
-            
-            savepackets!(packet_output, clock, packet_pos, packet_K, packet_U); # Save with latest velocity information
+
+            savepacketdata!(packet_output, clock,
+                new_velocity, new_grad_v, grid,
+                output_u, output_v, output_ux, output_uy, output_vx, output_vy,
+                packet_pos, packet_K, packet_U, packet_grad_U, Parameters.write_gradients)
+
             if (step % output_per_packet_freq == 0)
                 SequencedOutputs.saveoutput(output)
             end
