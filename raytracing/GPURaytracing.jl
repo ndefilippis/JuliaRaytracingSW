@@ -15,8 +15,17 @@ struct VelocityGradient
     vy::CuArray{Float32, 2}
 end
 
+@inline function normalize_to_texture_coords(x, x0, L, nx)
+    return (x - x0) / L + 0.5 / nx
+end
+
 @inline function dispersion_relation(k, l, f, Cg)::Float32
     return sqrt(f^2 + Cg^2*(k^2 + l^2))
+end
+
+
+@inline function dispersion_relation(k, l, f, Cg, pos_neg)::Float32
+    return pos_neg * sqrt(f^2 + Cg^2*(k^2 + l^2))
 end
 
 # Store dk as (N, 4), its fast to extract the x-component since its in a column
@@ -24,14 +33,14 @@ function dxkdt(dxk, xk, p, t)
     alpha = (t - p.t0) / (p.t1 - p.t0)
 
     x = @views xk[:, 1:2]
-    norm_x = @. (x - p.x0) / p.Lx + 0.5 / p.Nx
+    norm_x = @. normalize_to_texture_coords(x, p.x0, p.Lx, p.Nx)
     nx = @views norm_x[:, 1]
     ny = @views norm_x[:, 2]
 
     k1 = @views xk[:, 3]
     k2 = @views xk[:, 4]
 
-    ω = @. dispersion_relation(k1, k2, p.f, p.Cg)
+    ω = @. dispersion_relation(k1, k2, p.f, p.Cg, p.pos_neg)
     Cg_x = @. p.Cg^2 * k1 / ω
     Cg_y = @. p.Cg^2 * k2 / ω
 
@@ -59,10 +68,9 @@ function interpolate_velocity!(velocity::Velocity, positions, grid, output_U, ou
     texU  = CuTexture(velocity.u;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
     texV  = CuTexture(velocity.v;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
 
-    x = @views positions[:, 1]
-    y = @views positions[:, 2]
-    nx = (x .- grid.x[1]) / grid.Lx
-    ny = (y .- grid.y[1]) / grid.Ly
+    norm_coords = @. normalize_to_texture_coords(positions, grid.x[1], grid.Lx, grid.nx)
+    nx = @views norm_coords[:, 1]
+    ny = @views norm_coords[:, 2]
     
     broadcast!(output_U, nx, ny, Ref(texU)) do xi, yi, U
         U[xi, yi]
@@ -79,10 +87,9 @@ function interpolate_gradients!(gradient::VelocityGradient, positions, grid, out
     texVx  = CuTexture(gradient.vx;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
     texVy  = CuTexture(gradient.vy;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
 
-    x = @views positions[:, 1]
-    y = @views positions[:, 2]
-    nx = (x .- grid.x[1]) / grid.Lx
-    ny = (y .- grid.y[1]) / grid.Ly
+    norm_coords = @. normalize_to_texture_coords(positions, grid.x[1], grid.Lx, grid.nx)
+    nx = @views norm_coords[:, 1]
+    ny = @views norm_coords[:, 2]
     
     broadcast!(output_Ux, nx, ny, Ref(texUx)) do xi, yi, Ux
         Ux[xi, yi]
@@ -102,7 +109,7 @@ function interpolate_gradients!(gradient::VelocityGradient, positions, grid, out
 end
 
 function create_template_ode(wavepacket_array)
-    return ODEProblem(dxkdt, wavepacket_array, (0.0f0, 1.0f0), (0.0f0, ))
+    return ODEProblem(dxkdt, wavepacket_array, (0.0f0, 1.0f0), (0.0f0, )) # Place-holder ODE template
 end
 
 function raytrace!(ode_template, velocity1::Velocity, velocity2::Velocity, gradient1::VelocityGradient, gradient2::VelocityGradient, 
@@ -122,10 +129,12 @@ function raytrace!(ode_template, velocity1::Velocity, velocity2::Velocity, gradi
     ode_params = (
         U1 = texU1, V1 = texV1, Ux1 = texUx1, Uy1 = texUy1, Vx1 = texVx1, 
         U2 = texU2, V2 = texV2, Ux2 = texUx2, Uy2 = texUy2, Vx2 = texVx2, 
-        x0 = grid.x[1], Lx=grid.Lx, Nx = grid.nx, f=params.f, Cg=params.Cg, t0 = tspan[1], t1 = tspan[2])
+        x0 = grid.x[1], Lx=grid.Lx, Nx = grid.nx, f=params.f, Cg=params.Cg, 
+        pos_neg = params.frequency_sign,
+        t0 = tspan[1], t1 = tspan[2])
     prob = remake(ode_template; u0=wavepacket_array, tspan=tspan, p=ode_params)
 
-    sol = solve(prob, Vern6(), save_start=false, save_on=false)
+    sol = solve(prob, Vern7(), save_start=false, save_on=false)
 
     # Copy solution to the original destination
     wavepacket_array .= first(sol.u)

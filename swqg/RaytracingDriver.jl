@@ -46,7 +46,10 @@ function generate_initial_wavepackets(dev, L, k0, Npackets, sqrtNpackets)
     y .= repeat(diagonal, inner=sqrtNpackets)
     @. k = k0 * cos(phase)
     @. l = k0 * sin(phase)
-    return wavepackets_array;
+    @devzeros typeof(dev) Float32 Npackets frequency_sign
+    frequency_sign .= 1
+    @views frequency_sign[1:2:end] *= -1 # Make half of the rays negative frequencies
+    return wavepackets_array, frequency_sign;
 end
 
 function initialize_problem()
@@ -91,6 +94,7 @@ function savepacketproblem!(out, params)
     out["params/dt"] = params.dt
     out["params/N"] = params.Npackets
     out["params/k0"] = params.k0
+    out["params/ωsign"] = Array(params.frequency_sign)
 end
 
 function write_packets!(out, clock, pos, wavenumber, velocity)
@@ -163,8 +167,8 @@ function start!()
     # Create initial packets
     Npackets = Parameters.Npackets
     k0 = sqrt((Parameters.ω0 / Parameters.f)^2 - 1) * Parameters.f / Parameters.Cg
-    packets = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
-    packet_params = (f = Parameters.f, Cg = Parameters.Cg, dt = clock.dt, Npackets = Npackets, k0=k0);
+    packets, freq_sign = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
+    packet_params = (f = Parameters.f, Cg = Parameters.Cg, dt = clock.dt, Npackets = Npackets, k0=k0, frequency_sign = freq_sign);
 
     # Create Output objects
     filename_func(idx) = @sprintf("%s.%06d.jld2", Parameters.base_filename, idx)
@@ -215,11 +219,9 @@ function start!()
     
     packet_l = @views packets[:, 4]
     
-
 	get_streamfunction(prob) = prob.vars.ψh
     
     get_velocity_info(vars.ψh, grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
-    
 
     # Initial state
     SequencedOutputs.saveproblem(output)
@@ -251,13 +253,17 @@ function start!()
             get_velocity_info(get_streamfunction(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
         else 
     		for packet_step=packet_frames
-    	        SWQG.stepforward!(prob, diags, 1);
-                
-                SWQG.updatevars!(prob);
-    
-                get_velocity_info(get_streamfunction(prob), grid, packet_params, new_velocity, new_grad_v, temp_device_in_field, temp_device_out_field);
+                if(Parameters.use_stationary_background_flow)
+                    clock.step += 1
+                    clock.t += clock.dt
+                else
+    	            SWQG.stepforward!(prob, diags, 1);
+                    SWQG.updatevars!(prob);
+                end
+                get_velocity_info(get_streamfunction(prob), grid, 
+                                      packet_params, new_velocity, new_grad_v, 
+                                      temp_device_in_field, temp_device_out_field);
                 new_t = clock.t;
-    
                 raytrace!(ode_template, old_velocity, new_velocity, old_grad_v, new_grad_v, grid, packets, packet_params.dt, (old_t, new_t), packet_params);
                 old_velocity = new_velocity;
                 old_grad_v = new_grad_v;

@@ -32,6 +32,7 @@ module Parameters
 
     # Wavepackets output parameters
     packet_base_filename = "packets"
+    use_stationary_background_flow = false
     write_gradients = true
     packet_max_writes = 5000
     packet_output_dt = 0.2/f;

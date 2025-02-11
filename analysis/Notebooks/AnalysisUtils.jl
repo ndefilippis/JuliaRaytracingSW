@@ -228,10 +228,18 @@ function compute_ω(k, f, Cg)
     return sqrt.(f^2 .+ Cg^2*(k[:,1].^2 + k[:,2].^2))
 end
 
+function compute_ω(k, f, Cg, freq_sign)
+    return freq_sign .* sqrt.(f^2 .+ Cg^2*(k[:,1].^2 + k[:,2].^2))
+end
+
 function compute_doppler_shift(k, u)
     return @. k[:,1] * u[:,1] + k[:,2] * u[:,2]
 end
 
 function compute_Ω(k, u, f, Cg)
     return compute_ω(k, f, Cg) + compute_doppler_shift(k, u)
+end
+
+function compute_Ω(k, u, f, Cg, freq_sign)
+    return compute_ω(k, f, Cg, freq_sign) + compute_doppler_shift(k, u)
 end

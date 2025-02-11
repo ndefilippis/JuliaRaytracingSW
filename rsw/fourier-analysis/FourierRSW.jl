@@ -4,6 +4,7 @@ using Printf
 using JLD2
 using Printf
 using LinearAlgebra: ldiv!
+include("../RSWUtils.jl")
 
 function hann(L)
     ell = L + 1
@@ -25,6 +26,14 @@ function set_up_grid(directory)
     return grid
 end
 
+function set_up_grid(params)
+    setup_file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, 0), "r")
+    f = setup_file["params/f"]
+    Cg = setup_file["params/Cg"]
+    close(setup_file)
+    return (; f, Cg)
+end
+
 function get_total_frames(directory, file_indices)
     total_frames = 0
     
@@ -41,6 +50,7 @@ end
 
 function write_fourier_data(directory, file_indices, k_idx)
     grid = set_up_grid(directory)
+    params = set_up_params(directory)
     file_list = file_indices
     total_frames = get_total_frames(directory, file_indices)
     window = hann(total_frames)
@@ -52,12 +62,22 @@ function write_fourier_data(directory, file_indices, k_idx)
     dk = grid.kr[2] - grid.kr[1]
     t = zeros(total_frames)
     output_file = jldopen(@sprintf("radial_data_k=%03d.jld2", k_idx), "w")
+    
     ut = zeros(Complex{Float64}, total_frames, grid.nl)
     vt = zeros(Complex{Float64}, total_frames, grid.nl)
-    #ug = zeros(Complex{Float64}, total_frames, grid.nl)
-    #vg = zeros(Complex{Float64}, total_frames, grid.nl)
-    #uw = zeros(Complex{Float64}, total_frames, grid.nl)
-    #vw = zeros(Complex{Float64}, total_frames, grid.nl)
+    ηt = zeros(Complex{Float64}, total_frames, grid.nl)
+    ug = zeros(Complex{Float64}, total_frames, grid.nl)
+    vg = zeros(Complex{Float64}, total_frames, grid.nl)
+    ηg = zeros(Complex{Float64}, total_frames, grid.nl)
+    uw = zeros(Complex{Float64}, total_frames, grid.nl)
+    vw = zeros(Complex{Float64}, total_frames, grid.nl)
+    ηw = zeros(Complex{Float64}, total_frames, grid.nl)
+    C1 = zeros(Complex{Float64}, total_frames, grid.nl)
+    C2 = zeros(Complex{Float64}, total_frames, grid.nl)
+    C3 = zeros(Complex{Float64}, total_frames, grid.nl)
+
+    Φ₀, Φ₊, Φ₋ = compute_balanced_wave_bases(grid, params)
+    
     println("k=" * string(k_idx))
     flush(stdout)
     base_index = 0
@@ -69,37 +89,42 @@ function write_fourier_data(directory, file_indices, k_idx)
             t[base_index + frame_idx] = file["snapshots/t/" * frame_key]
             snapshot = file["snapshots/sol/" * frame_key]
 
-            ut[base_index+frame_idx,:] = snapshot[k_idx,:,1]
-            vt[base_index+frame_idx,:] = snapshot[k_idx,:,2]
+            uh = @views snapshot[:,:,1]
+            vh = @views snapshot[:,:,2]
+            ηh = @views snapshot[:,:,3]
+            (ugh, vgh, ηgh), (uwh, vwh, ηwh) = wave_balanced_decomposition(uh, vh, ηh, grid, params)
+            c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋)
 
-            #Gh, Wh = decompose_balanced_wave(normalized_fft, grid)
-
-            #ug[base_index+frame_idx,:] = Gh[k_idx,:,1]
-            #vg[base_index+frame_idx,:] = Gh[k_idx,:,2]
-                
-            #uw[base_index+frame_idx,:] = Wh[k_idx,:, 1]
-            #vw[base_index+frame_idx,:] = Wh[k_idx,:, 2]
+            ut[base_index+frame_idx,:] .= @views  uh[k_idx, :]
+            vt[base_index+frame_idx,:] .= @views  vh[k_idx, :]
+            ηt[base_index+frame_idx,:] .= @views  ηh[k_idx, :]
+            ug[base_index+frame_idx,:] .= @views ugh[k_idx, :]
+            vg[base_index+frame_idx,:] .= @views vgh[k_idx, :]
+            ηg[base_index+frame_idx,:] .= @views ηgh[k_idx, :]
+            uw[base_index+frame_idx,:] .= @views uwh[k_idx, :]
+            vw[base_index+frame_idx,:] .= @views vwh[k_idx, :]
+            ηw[base_index+frame_idx,:] .= @views ηwh[k_idx, :]
+            C₀[base_index+frame_idx,:] .= @views  c₀[k_idx, :]
+            C₊[base_index+frame_idx,:] .= @views  c₊[k_idx, :]
+            C₋[base_index+frame_idx,:] .= @views  c₋[k_idx, :]
         end
         close(file)
         base_index += length(frames)
     end
     output_file["k"] = grid.kr[k_idx]
     output_file["t"] = t
-    output_file["ut_series"] = ut
-    output_file["vt_series"] = vt
-    #output_file["ug_series"] = ug
-    #output_file["vg_series"] = vg
-    #output_file["uw_series"] = uw
-    #output_file["vw_series"] = vw
-    output_file["ut"] = fft(window .* ut, 1)
-    output_file["vt"] = fft(window .* vt, 1)
-    #output_file["ug"] = fft(window .* ug, 1)
-    #output_file["vg"] = fft(window .* vg, 1)
-    #output_file["uw"] = fft(window .* uw, 1)
-    #output_file["vw"] = fft(window .* vw, 1)
-    #output_file["U_balanced"] = fft(window .* ((ut + ug) + 1im*(vt + vg)), 1)
-    #output_file["U_wave"] = fft(window .* (uw + 1im*vw), 1)
-    #output_file["U_total"] = fft(window .* ((uw + ug + ut) + 1im*(vw + vg + vt)), 1)
+    output_file["ut"]  = fft(window .* ut, 1)
+    output_file["vt"]  = fft(window .* vt, 1)
+    output_file["ηt"]  = fft(window .* ηt, 1)
+    output_file["ugt"] = fft(window .* ug, 1)
+    output_file["vgt"] = fft(window .* vg, 1)
+    output_file["ηgt"] = fft(window .* ηg, 1)
+    output_file["uwt"] = fft(window .* uw, 1)
+    output_file["vwt"] = fft(window .* vw, 1)
+    output_file["ηwt"] = fft(window .* ηw, 1)
+    output_file["c0t"] = fft(window .* C₀, 1)
+    output_file["c+t"] = fft(window .* C₊, 1)
+    output_file["c-t"] = fft(window .* C₋, 1)
     close(output_file)
     println("Done with k="*string(k_idx))
 end

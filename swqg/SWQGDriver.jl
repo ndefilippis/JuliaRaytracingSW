@@ -2,11 +2,13 @@ using .SWQG
 using .SequencedOutputs
 using FourierFlows
 using Printf
+using Random: seed!
 using LinearAlgebra: ldiv!
 
 import .Parameters
 
 function set_shafer_initial_condition_QG!(prob, Kg, ag)
+    seed!(1234)
     grid = prob.grid
     dev = typeof(grid.device)
     T = typeof(grid.Lx)
