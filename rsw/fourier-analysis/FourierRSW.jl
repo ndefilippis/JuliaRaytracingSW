@@ -4,7 +4,7 @@ using Printf
 using JLD2
 using Printf
 using LinearAlgebra: ldiv!
-include("../RSWUtils.jl")
+include("RSWUtils.jl")
 
 function hann(L)
     ell = L + 1
@@ -12,6 +12,31 @@ function hann(L)
     n = 0:N
     w = @. 0.5 * (1 - cos.(2*π*n/N))
     return w[1:end-1]
+end
+
+function demean(data)
+    mean = sum(data, dims=1) / size(data, 1)
+    return data .- mean
+end
+
+function linear_least_squares(t, data)
+    tsum = sum(t)
+    t2sum = sum(t.^2)
+    txsum = sum(t .* data, dims=1)
+    N = size(t,1)
+    slope = (N * (txsum)) / (N * t2sum - tsum.^2)
+    intercept = -slope * tsum / N
+    return (slope, intercept)
+end
+
+function detrend(t, data)
+    m, b = linear_least_squares(t, demean(data))
+    return data .- m .* t .- b
+end
+
+function clean_fft(t, data, window)
+    clean_data = detrend(t, data)
+    return fft(window .* clean_data, 1)
 end
 
 function set_up_grid(directory)
@@ -26,12 +51,12 @@ function set_up_grid(directory)
     return grid
 end
 
-function set_up_grid(params)
+function set_up_params(directory)
     setup_file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, 0), "r")
     f = setup_file["params/f"]
-    Cg = setup_file["params/Cg"]
+    Cg2 = setup_file["params/Cg2"]
     close(setup_file)
-    return (; f, Cg)
+    return (; f, Cg2)
 end
 
 function get_total_frames(directory, file_indices)
@@ -72,9 +97,9 @@ function write_fourier_data(directory, file_indices, k_idx)
     uw = zeros(Complex{Float64}, total_frames, grid.nl)
     vw = zeros(Complex{Float64}, total_frames, grid.nl)
     ηw = zeros(Complex{Float64}, total_frames, grid.nl)
-    C1 = zeros(Complex{Float64}, total_frames, grid.nl)
-    C2 = zeros(Complex{Float64}, total_frames, grid.nl)
-    C3 = zeros(Complex{Float64}, total_frames, grid.nl)
+    C₀ = zeros(Complex{Float64}, total_frames, grid.nl)
+    C₊ = zeros(Complex{Float64}, total_frames, grid.nl)
+    C₋ = zeros(Complex{Float64}, total_frames, grid.nl)
 
     Φ₀, Φ₊, Φ₋ = compute_balanced_wave_bases(grid, params)
     
@@ -113,18 +138,18 @@ function write_fourier_data(directory, file_indices, k_idx)
     end
     output_file["k"] = grid.kr[k_idx]
     output_file["t"] = t
-    output_file["ut"]  = fft(window .* ut, 1)
-    output_file["vt"]  = fft(window .* vt, 1)
-    output_file["ηt"]  = fft(window .* ηt, 1)
-    output_file["ugt"] = fft(window .* ug, 1)
-    output_file["vgt"] = fft(window .* vg, 1)
-    output_file["ηgt"] = fft(window .* ηg, 1)
-    output_file["uwt"] = fft(window .* uw, 1)
-    output_file["vwt"] = fft(window .* vw, 1)
-    output_file["ηwt"] = fft(window .* ηw, 1)
-    output_file["c0t"] = fft(window .* C₀, 1)
-    output_file["c+t"] = fft(window .* C₊, 1)
-    output_file["c-t"] = fft(window .* C₋, 1)
+    output_file["ut"]  = clean_fft(t, ut, window)
+    output_file["vt"]  = clean_fft(t, vt, window)
+    output_file["ηt"]  = clean_fft(t, ηt, window)
+    output_file["ugt"] = clean_fft(t, ug, window)
+    output_file["vgt"] = clean_fft(t, vg, window)
+    output_file["ηgt"] = clean_fft(t, ηg, window)
+    output_file["uwt"] = clean_fft(t, uw, window)
+    output_file["vwt"] = clean_fft(t, vw, window)
+    output_file["ηwt"] = clean_fft(t, ηw, window)
+    output_file["c0t"] = clean_fft(t, C₀, window)
+    output_file["c+t"] = clean_fft(t, C₊, window)
+    output_file["c-t"] = clean_fft(t, C₋, window)
     close(output_file)
     println("Done with k="*string(k_idx))
 end

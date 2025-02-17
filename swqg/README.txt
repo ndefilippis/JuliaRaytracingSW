@@ -1,1 +1,1 @@
-Testing SWQG Flow with a single static seed
+Running with no contribution to the group velocity

@@ -5,8 +5,9 @@ module Parameters
 
     # Equation parameters
 
-    Cg = parse(Float32, ARGS[3])
-    f = 3.0 * Cg # Maintain a constant deformation radius
+    packet_Cg = 0
+    background_Cg = 3.0
+    f = 1.0 # Maintain a constant deformation radius
 
     nν = 4
     νtune  = 1
@@ -28,7 +29,7 @@ module Parameters
 
     # Initial condition parameters
     Kg = (10, 13)
-    ag = parse(Float32, ARGS[1])
+    ag = 0.5
 
     # Wavepackets output parameters
     packet_base_filename = "packets"

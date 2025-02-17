@@ -81,7 +81,7 @@ function initialize_problem()
 
     println(@sprintf("Packets: %d. Output every %d steps. Total %d packet frames", Parameters.Npackets, packet_output_freq, (nsteps - spinup_step) / packet_output_freq))
     
-    prob = SWQG.Problem(dev; Lx, nx, dt, Parameters.f, Cg=Parameters.Cg, T=Float32, nν, ν, aliased_fraction=1/3, use_filter=false)
+    prob = SWQG.Problem(dev; Lx, nx, dt, Parameters.f, Cg=Parameters.background_Cg, T=Float32, nν, ν, aliased_fraction=1/3, use_filter=false)
     
     set_shafer_initial_condition_QG!(prob, Parameters.Kg, Parameters.ag)
 
@@ -157,6 +157,7 @@ function get_velocity_info(ψh, grid, params, v_info, grad_v_info, temp_in_field
 end
 
 function start!()
+    seed!(1234)
     # Set up single layer QG problem
     prob, nsteps, spinup_step, output_per_packet_freq, packet_output_freq, diags_freq = initialize_problem()
     SWQG.enforce_reality_condition!(prob)
@@ -166,9 +167,9 @@ function start!()
 
     # Create initial packets
     Npackets = Parameters.Npackets
-    k0 = sqrt((Parameters.ω0 / Parameters.f)^2 - 1) * Parameters.f / Parameters.Cg
+    k0 = sqrt((Parameters.ω0 / Parameters.f)^2 - 1) * Parameters.f / Parameters.background_Cg
     packets, freq_sign = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
-    packet_params = (f = Parameters.f, Cg = Parameters.Cg, dt = clock.dt, Npackets = Npackets, k0=k0, frequency_sign = freq_sign);
+    packet_params = (f = Parameters.f, Cg = Parameters.packet_Cg, dt = clock.dt, Npackets = Npackets, k0=k0, frequency_sign = freq_sign);
 
     # Create Output objects
     filename_func(idx) = @sprintf("%s.%06d.jld2", Parameters.base_filename, idx)

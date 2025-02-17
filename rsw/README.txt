@@ -1,1 +1,1 @@
-Testing No waves case and varying Fr
+Running matching RSW simulations with SWQG raytracing

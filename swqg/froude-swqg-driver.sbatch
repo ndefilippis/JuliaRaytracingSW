@@ -7,7 +7,7 @@
 #SBATCH --time=06:00:00
 #SBATCH --gres=gpu:rtx8000:1
 #SBATCH --job-name=swqg_ray
-#SBATCH --array=13-17
+#SBATCH --array=1-17
 #SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge

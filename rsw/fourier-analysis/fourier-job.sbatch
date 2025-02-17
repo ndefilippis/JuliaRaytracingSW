@@ -20,6 +20,7 @@ job_size=$(($max_K/$SLURM_ARRAY_TASK_COUNT))
 
 mkdir -p $rundir
 cp fourier-job.sbatch FourierRSW.jl README.txt $rundir
+cp ../RSWUtils.jl $rundir
 cd $rundir
 
 julia -t $SLURM_CPUS_PER_TASK FourierRSW.jl $analysis_directory $max_file $SLURM_ARRAY_TASK_ID $job_size > run.log

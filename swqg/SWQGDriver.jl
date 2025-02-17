@@ -2,13 +2,12 @@ using .SWQG
 using .SequencedOutputs
 using FourierFlows
 using Printf
-using Random: seed!
+using Random
 using LinearAlgebra: ldiv!
 
 import .Parameters
 
 function set_shafer_initial_condition_QG!(prob, Kg, ag)
-    seed!(1234)
     grid = prob.grid
     dev = typeof(grid.device)
     T = typeof(grid.Lx)
@@ -67,6 +66,7 @@ function savediagnostics(diagnostics, diagnostic_names)
 end
 
 function start!()
+    Random.seed!(1234)
     prob, nsteps, spinup_step, output_freq, diags_freq = initialize_problem()
     grid, clock, vars, params = prob.grid, prob.clock, prob.vars, prob.params
     

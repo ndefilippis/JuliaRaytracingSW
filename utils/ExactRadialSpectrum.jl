@@ -4,7 +4,7 @@ using SparseArrays
 function create_radialspectrum_weights(grid, resolution_factor=2)
     dk = grid.kr[2] - grid.kr[1]
     radii = (1:(resolution_factor * (grid.nkr-2))) / resolution_factor * dk
-    num_radii = floor(Int, resolution_factor * (grid.nkr-2)
+    num_radii = floor(Int, resolution_factor * (grid.nkr-2))
     previous_weights = zeros(grid.nkr, grid.nl)
     weight_matrix = Vector{SparseMatrixCSC}(undef, num_radii)
     for r_idx=1:num_radii
