@@ -319,16 +319,18 @@ function set_solution!(prob, u0h, v0h, η0h)
     return nothing
 end
 
-function energy(prob)
-    updatevars!(prob)
-    
-    return energy(prob.vars.u, prob.vars.v, prob.vars.η, prob.params.Cg2)
+function kinetic_energy(uh, vh, grid)
+    return parsevalsum2(vars.uh , grid) / (2 * grid.Lx * grid.Ly) + parsevalsum2(vars.vh , grid) / (2 * grid.Lx * grid.Ly)
 end
+@inline kinetic_energy(prob) = kinetic_energy(prob.sol, prob.vars, prob.params, prob.grid)
+@inline kinetic_energy(sol, vars, params, grid) = kinetic_energy(prob.vars.uh, prob.vars.vh, prob.grid)
 
-function energy(u, v, η, Cg2)
-    KE = 0.5 * sum(@. (1 + η) * (u^2 + v^2))
-    PE = 0.5 * Cg2 * sum(@. (1 + η)^2 - 1)
-    return (KE, PE)
+function potential_energy(ηh, params, grid)
+  return params.Cg2 * parsevalsum2(vars.ηh, grid) / (grid.Lx * grid.Ly)
 end
+@inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)
+@inline potential_energy(sol, vars, params, grid) = potential_energy(prob.vars.ηh, prob.grid, prob.params)
 
+@inline energy(prob) = energy(prob.sol, prob.vars, prob.params, prob.grid)
+@inline energy(sol, vars, params, grid) = kinetic_energy(sol, vars, params, grid) + potential_energy(sol, vars, params, grid)
 end

@@ -167,7 +167,7 @@ function start!()
 
     # Create initial packets
     Npackets = Parameters.Npackets
-    k0 = sqrt((Parameters.ω0 / Parameters.f)^2 - 1) * Parameters.f / Parameters.background_Cg
+    k0 = sqrt(Parameters.ω0^2 - Parameters.f^2) / Parameters.background_Cg
     packets, freq_sign = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
     packet_params = (f = Parameters.f, Cg = Parameters.packet_Cg, dt = clock.dt, Npackets = Npackets, k0=k0, frequency_sign = freq_sign);
 
@@ -270,10 +270,6 @@ function start!()
                 old_grad_v = new_grad_v;
                 old_t = new_t;
             end                    
-            mask = @. packet_k^2 + packet_l^2 >= Parameters.k_cutoff^2
-            packet_k[mask] .= packet_params.k0
-            packet_l[mask] .= 0
-    
 
             savepacketdata!(packet_output, clock,
                 new_velocity, new_grad_v, grid,

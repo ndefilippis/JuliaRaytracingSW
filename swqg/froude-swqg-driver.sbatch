@@ -3,11 +3,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=24GB
-#SBATCH --time=06:00:00
+#SBATCH --mem=15GB
+#SBATCH --time=1-23:00:00
 #SBATCH --gres=gpu:rtx8000:1
 #SBATCH --job-name=swqg_ray
-#SBATCH --array=1-17
+#SBATCH --array=7-7
 #SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge

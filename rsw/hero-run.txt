@@ -1,0 +1,2 @@
+ArrayTaskID ag aw Cg
+5 0.50 0.1 0.50

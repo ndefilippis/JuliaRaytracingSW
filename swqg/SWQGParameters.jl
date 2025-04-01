@@ -20,12 +20,11 @@ module Parameters
     # Output and timing parameters
     spinup_T = 2000.
     T = 2100.
-    output_dt = 1.0/f
+    output_dt = 0.03/f
     diag_dt = 0.05
 
     max_writes = 3000
     base_filename= "qgsw"
-
 
     # Initial condition parameters
     Kg = (10, 13)

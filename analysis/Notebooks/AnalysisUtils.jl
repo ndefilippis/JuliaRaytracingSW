@@ -25,8 +25,9 @@ function read_parameters(directory)
     file = jldopen(@sprintf("%s/packets.%06d.jld2", directory, 0))
     f0 = file["params/f0"]
     Cg = file["params/Cg"]
+    freq_sign = file["params/ωsign"]
     close(file)
-    return f0, Cg
+    return f0, Cg, freq_sign
 end
 
 function compute_strain_vorticity(ψh)
@@ -53,6 +54,46 @@ function compute_strain_vorticity(ψh)
     σ = @. sqrt(σn^2 + σs^2)
 
     return σs, σn, σ, ζ
+end
+
+function get_qgsw_times(directory)
+    Nsnapshots = count_qgsw_snapshots(directory)
+    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
+    file_idx = 0
+    snap_idx = 1
+
+    times = zeros(Nsnapshots)
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        num_snapshots = length(keys(file["snapshots/t/"]))
+        for snapshot_key=keys(file["snapshots/t/"])
+            times[snap_idx] = file["snapshots/t/" * snapshot_key]
+            snap_idx += 1
+        end
+        close(file)
+    end
+    return times
+end
+
+function get_packet_times(directory)
+    Nsnapshots = count_qgsw_snapshots(directory)
+    filename_func(idx) = @sprintf("%s/packet.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("packet.", file)])-1
+    file_idx = 0
+    snap_idx = 1
+
+    times = zeros(Nsnapshots)
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        num_snapshots = length(keys(file["p/t/"]))
+        for snapshot_key=keys(file["p/t/"])
+            times[snap_idx] = file["p/t/" * snapshot_key]
+            snap_idx += 1
+        end
+        close(file)
+    end
+    return times
 end
 
 function load_last_snapshot(directory, grid)
@@ -243,3 +284,77 @@ end
 function compute_Ω(k, u, f, Cg, freq_sign)
     return compute_ω(k, f, Cg, freq_sign) + compute_doppler_shift(k, u)
 end
+
+function get_diagnostics(directory)
+    file = jldopen(@sprintf("%s/diagnostics.jld2", directory))
+    diag_t = file["diagnostics/potential_energy/t"]
+    PE = file["diagnostics/potential_energy/data"]  # PE = Kd^2/2 * <ψ>
+    KE = file["diagnostics/kinetic_energy/data"]    # KE = <∇ψ>/2
+    Z = file["diagnostics/enstrophy/data"]
+    close(file)
+    return (diag_t, KE, PE, Z)
+end
+
+function map_snapshots(directory, map_function, array_result)
+    array_index = 1
+    filename_func(idx) = @sprintf("%s/packets.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("packets.", file)])-1
+    file_idx = 1
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        for snapshot=keys(file["p/t"])
+            t =  file["p/t/" * snapshot]
+            x =  file["p/x/" * snapshot]
+            k =  file["p/k/" * snapshot]
+            u =  file["p/u/" * snapshot]
+            array_result[array_index] = map_function(t, x, k, u)
+            array_index += 1
+        end
+        close(file)
+    end
+    return array_result
+end
+
+function mapreduce_snapshots(directory, map_function, reduce_function, accumulator)
+    filename_func(idx) = @sprintf("%s/packets.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("packets.", file)])-1
+    file_idx = 1
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        for snapshot=keys(file["p/t"])
+            t =  file["p/t/" * snapshot]
+            x =  file["p/x/" * snapshot]
+            k =  file["p/k/" * snapshot]
+            u =  file["p/u/" * snapshot]
+            accumulator = reduce_function(map_function(t, x, k, u), accumulator)
+        end
+        close(file)
+    end
+    return accumulator
+end
+
+function mapfilter_snapshots(directory, map_function, filter_function, array_result)
+    array_index = 1
+    snap_index = 1
+    filename_func(idx) = @sprintf("%s/packets.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("packets.", file)])-1
+    file_idx = 1
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        for snapshot=keys(file["p/t"])
+            t =  file["p/t/" * snapshot]
+            x =  file["p/x/" * snapshot]
+            k =  file["p/k/" * snapshot]
+            u =  file["p/u/" * snapshot]
+            
+            if(filter_function(snap_index, t, x, k, u))
+                array_result[array_index] = map_function(t, x, k, u)
+                array_index += 1
+            end
+            snap_index += 1
+        end
+        close(file)
+    end
+    return array_result
+end
+

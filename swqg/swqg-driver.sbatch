@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=24GB
-#SBATCH --time=2-00:00:00
+#SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=ray_qgsw
 
@@ -19,6 +19,6 @@ cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir
 cp SWQGParameters.jl $rundir/Parameters.jl
 cd $rundir
 
-julia -t $SLURM_CPUS_PER_TASK RSWMain.jl > run.log
+julia -t $SLURM_CPUS_PER_TASK SWQGMain.jl > run.log
 
 exit

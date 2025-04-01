@@ -1,7 +1,7 @@
 module Parameters
     # Domain parameters
     L  = 2π
-    nx = 512
+    nx = 2048
 
     # Equation parameters
     
@@ -12,14 +12,14 @@ module Parameters
     νtune  = 1
 
     # Time stepper parameters
-    cfltune = 0.1
+    cfltune = 0.04
     use_filter = (νtune == 0)
     filter_order = 8
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 2100.
-    T = 2200.
+    spinup_T = 1100.
+    T = 1200.
     output_dt = 0.03
     diag_dt = 0.01
 

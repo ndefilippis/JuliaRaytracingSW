@@ -76,8 +76,7 @@ end
 function write_fourier_data(directory, file_indices, k_idx)
     grid = set_up_grid(directory)
     params = set_up_params(directory)
-    file_list = file_indices
-    total_frames = get_total_frames(directory, file_indices)
+    total_frames = get_total_frames(directory, file_indices) - 1 # Exclue initial time data
     window = hann(total_frames)
 
     println("Starting...")
@@ -105,11 +104,15 @@ function write_fourier_data(directory, file_indices, k_idx)
     
     println("k=" * string(k_idx))
     flush(stdout)
-    base_index = 0
-    for i=file_list
+    base_index = -1 # To account for skipping the first time snap-shot
+    for i=file_indices
         file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, i), "r")
         frames = keys(file["snapshots/t"])
         for frame_idx=1:length(frames)
+            if (i == file_indices[1] && frame_idx == 1)
+                # Skip the initial time data
+                continue
+            end
             frame_key = frames[frame_idx]
             t[base_index + frame_idx] = file["snapshots/t/" * frame_key]
             snapshot = file["snapshots/sol/" * frame_key]

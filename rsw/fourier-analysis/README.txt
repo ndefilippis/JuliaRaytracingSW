@@ -1,1 +1,1 @@
-Redo Fourier Analysis with detrended time series
+Fix issue where the initial data frame was being accounted into the Fourier analysis

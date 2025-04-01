@@ -52,7 +52,7 @@ function initialize_problem()
     
     println(@sprintf("Total time: %f, Time step: %f, Estimated CFL: %0.3f", Parameters.T, dt, Parameters.cfltune))
     
-    prob = SWQG.Problem(dev; Lx, nx, dt, f, T=Float32, nν, ν, aliased_fraction=1/3, make_filter=false)
+    prob = SWQG.Problem(dev; Lx, nx, dt, f=Parameters.f, Cg=Parameters.Cg, T=Float32, nν, ν, aliased_fraction=1/3, make_filter=false)
     
     set_shafer_initial_condition_QG!(prob, (10, 13), 0.3)
 
@@ -94,7 +94,7 @@ function start!()
             flush(stdout)
         end
         SWQG.stepforward!(prob, diags, output_freq)
-        if(any(isnan.(vars.η)))
+        if(any(isnan.(vars.q)))
             println("Blew up at step ", clock.step)
             savediagnostics(diags, diag_names)
             SequencedOutputs.close(output)

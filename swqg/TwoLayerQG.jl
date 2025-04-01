@@ -1,13 +1,4 @@
-module SWQG
-export
-    Problem,
-    set_solution!,
-    enforce_reality_condition!,
-    updatevars!,
-    energy,
-    kinetic_energy,
-    potential_energy,
-    enstrophy
+module TwoLayerQG
 
 using FourierFlows
 using FourierFlows: parsevalsum2
@@ -16,10 +7,14 @@ using CUDA
 using LinearAlgebra: mul!, ldiv!
 using ..IFMAB3
 
+# Only implemented for equal layer heights
+
 struct Params{T} <: AbstractParams
+    U :: T         # Background flow velocity
+    μ :: T         # Linear bottom drag coefficient
     ν :: T         # Hyperviscosity coefficient
     nν :: Int       # Order of the hyperviscous operator
-    Kd2 :: T         # Deformation wavenumber squared
+    F :: T         # Function of Rossby deformation wavenumber
 end
 
 struct Vars{Aphys, Atrans} <: AbstractVars
@@ -35,58 +30,34 @@ struct Vars{Aphys, Atrans} <: AbstractVars
     vh  :: Atrans
 end
 
-struct StochasticVars{Aphys, Atrans} <: AbstractVars
-    ψ  :: Aphys
-    q  :: Aphys
-    ζ  :: Aphys
-    ψh  :: Atrans
-    qh  :: Atrans
-    ζh  :: Atrans
-    Fh  :: Atrans
-end
-
-function StochasticVars(grid)
-    Dev = typeof(grid.device)
-    T = eltype(grid)
-    
-    @devzeros Dev T (grid.nx, grid.ny) ψ q ζ
-    @devzeros Dev Complex{T} (grid.nkr, grid.nl) ψh qh ζh Fh
-    
-    return Vars(ψ, q, ζ, ψh, qh, ζh, Fh)
-end
-
 function Vars(grid)
     Dev = typeof(grid.device)
     T = eltype(grid)
     
-    @devzeros Dev T (grid.nx, grid.ny) ψ q ζ u v
-    @devzeros Dev Complex{T} (grid.nkr, grid.nl) ψh qh ζh uh vh
+    @devzeros Dev T (grid.nx, grid.ny, 2) ψ q ζ u v
+    @devzeros Dev Complex{T} (grid.nkr, grid.nl, 2) ψh qh ζh uh vh
     
     return Vars(ψ, q, ζ, u, v, ψh, qh, ζh, uh, vh)
 end
-
-nothingfunction(args...) = nothing
 
 function Problem(dev::Device = CPU();
     nx = 128,
     ny = nx,
     Lx = 2π,
     Ly = Lx,
-    ν  = 1.0e-16,
+    ν = 1e-6,
     nν = 4,
-    f = 1.0,
-    Cg = 1.0,
+    Kd2 = 3.0,
     stepper = "IFMAB3",
     dt = 5e-2,
-    calcF! = nothingfunction,
     aliased_fraction = 1/3,
     T = Float64,
     use_filter=false,
     stepper_kwargs...)
-   
+
     grid = TwoDGrid(dev; nx, Lx, ny, Ly, aliased_fraction, T)
-    params = Params{T}(ν, nν, f^2/Cg^2)
-    vars = calcF! == nothingfunction ? Vars(grid) : StochasticVars(grid)
+    params = Params{T}(U, μ, ν, nν, Kd2/2)
+    vars = Vars(grid)
     equation = Equation(params, grid)
     if stepper == "IFMAB3"
         clock = FourierFlows.Clock{T}(dt, 0, 0)
@@ -99,11 +70,22 @@ function Problem(dev::Device = CPU();
 end
 
 function pvfromstreamfunction!(qh, ψh, grid, params)
-    @. qh = -(grid.Krsq + params.Kd2) * ψh
+    ψ1h = @views ψh[:,:,1]
+    ψ2h = @views ψh[:,:,2]
+    q1h = @views qh[:,:,1]
+    q2h = @views qh[:,:,2]
+    @. q1h = -grid.Krsq * ψh1 + params.F * (ψh2 - ψh1)
+    @. q2h = -grid.Krsq * ψh2 + params.F * (ψh1 - ψh2)
 end
 
 function streamfunctionfrompv!(ψh, qh, grid, params)
-    @. ψh = -qh / (grid.Krsq + params.Kd2)
+    ψ1h = @views ψh[:,:,1]
+    ψ2h = @views ψh[:,:,2]
+    q1h = @views qh[:,:,1]
+    q2h = @views qh[:,:,2]
+    @. ψ1h = -grid.Krsq * qh1 - params.F * (qh2 + qh1)
+    @. ψ2h = -grid.Krsq * qh2 - params.F * (qh1 + qh2)
+    @. ψh /= grid.Krsq*(grid.Krsq + 2*params.F)
 end
 
 function updatevars!(prob)
@@ -139,17 +121,14 @@ end
 
 function calcN!(N, sol, t, clock, vars, params, grid)
     dealias!(sol, grid)
-    
+
     @. vars.qh = sol
-    streamfunctionfrompv!(vars.ψh, vars.qh, grid, params)
-    qh = vars.ζh
+    streamfunctionfrompv(vars.ψh, vars.qh, grid, params)
+    qh = vars.ζh # Use ζh as a temporary variable
     @. qh = vars.qh
     ldiv!(vars.q, grid.rfftplan, qh)
-
+    
     # Use ζ and ζh as scratch variables
-    # Calculate advective terms
-    # q_t = -J(ψ, q)
-    # Use the fact that J(f, g) = (f_xg)_y - (f_yg)_x
     ψxqh = vars.ζh
     ψxq = vars.ζ
     @. ψxqh = 1im * grid.kr * vars.ψh
@@ -169,24 +148,19 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     return nothing
 end
 
-addforcing!(N, sol, t, clock, vars::Vars, params, grid) = nothing
-
-function addforcing!(N, sol, t, clock, vars::StochasticVars, params, grid)
-  params.calcF!(vars.Fh, sol, t, clock, vars, params, grid)
-  
-  @. N += vars.Fh
-  return nothing
-end
-
 function Equation(params, grid)
     T = eltype(grid)
     dev = grid.device
 
     # For the standard diagonal problem
     D = @. - params.ν * grid.Krsq^(params.nν)
-    L = zeros(dev, T, (grid.nkr, grid.nl))
-    L .= D
+    L = zeros(dev, T, (grid.nkr, grid.nl, 2))
+    L .= D          # Hyperviscous dissipation
 
+    L1 = @views L[:, :, 1]
+    L2 = @views L[:, :, 2]
+    L1 .+= 1im * params.U * grid.kr                 # Add mean-flow advection
+    L2 .+= -1im * params.U * grid.kr .- params.μ    # Add bottom drag and mean-flow advection
     return FourierFlows.Equation(L, calcN!, grid)
 end
 

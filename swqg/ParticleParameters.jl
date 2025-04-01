@@ -5,9 +5,9 @@ module Parameters
 
     # Equation parameters
 
-    packet_Cg = 0
+    packet_Cg = 3.0 
     background_Cg = 3.0
-    f = 1.0 # Maintain a constant deformation radius
+    f = 0.1 # Maintain a constant deformation radius
 
     nν = 4
     νtune  = 1
@@ -19,8 +19,8 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 200.
-    T = 3000.
+    spinup_T = 500.
+    T = 7000.
     output_dt = 10.0
     diag_dt = 0.5
 
@@ -41,6 +41,6 @@ module Parameters
     # Wavepackets parameters
     sqrtNpackets = 128; # Square root of the number of wavepackets;
     Npackets = sqrtNpackets^2;
-    ω0 = sqrt(f^2 + Cg^2 * parse(Float32, ARGS[2])^2); # How close to f the initial wavepacket frequencies are
-    k_cutoff = 1000*f/Cg # The wavenumber that we reset a off a wavepacket
+    ω0 = 2.0; # How close to f the initial wavepacket frequencies are
+    k_cutoff = 1000 # The wavenumber that we reset a off a wavepacket
 end
