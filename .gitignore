@@ -1,5 +1,4 @@
-*.ipynb*
-*.ipynb
+.ipynb_checkpoints
 slurm*.out
 *.mp4
 *.pdf
