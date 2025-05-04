@@ -152,10 +152,10 @@ function count_snapshots(directory)
     return num_snapshots
 end
 
-function count_qgsw_snapshots(directory)
+function count_key_snapshots(directory, key)
     num_snapshots = 0
-    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
-    num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
+    filename_func(idx) = @sprintf("%s/%s.%06d.jld2", directory, key, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin(key * ".", file)])-1
     file_idx = 1
     for j=0:num_files
         file = jldopen(filename_func(j))
@@ -163,6 +163,10 @@ function count_qgsw_snapshots(directory)
         close(file)
     end
     return num_snapshots
+end
+
+function count_qgsw_snapshots(directory)
+    return count_key_snapshots(directory, "qgsw")
 end
 
 function load_snapshot(directory, snap_idx; load_gradients=false)
@@ -222,7 +226,9 @@ function load_qgsw_snapshot(directory, grid, snap_idx)
         file_idx -= length(keys(file["snapshots/t"]))
         close(file)
     end
-    Kd2 = file["params/Kd2"]
+    first_file = jldopen(filename_func(0))
+    Kd2 = first_file["params/Kd2"]
+    close(first_file)
     key = keys(file["snapshots/t"])[file_idx]
     t = file["snapshots/t/" * key]
     qh = file["snapshots/sol/" * key]
@@ -253,7 +259,9 @@ function load_qgswh_snapshot(directory, grid, snap_idx)
         file_idx -= length(keys(file["snapshots/t"]))
         close(file)
     end
-    Kd2 = file["params/Kd2"]
+    first_file = jldopen(filename_func(0))
+    Kd2 = first_file["params/Kd2"]
+    close(first_file)
     key = keys(file["snapshots/t"])[file_idx]
     t = file["snapshots/t/" * key]
     qh = file["snapshots/sol/" * key]
@@ -263,6 +271,52 @@ function load_qgswh_snapshot(directory, grid, snap_idx)
 
     close(file)
     return t, qh, ψh, uh, vh, Kd2
+end
+
+function load_2L_qg_params(directory)
+    filename_func(idx) = @sprintf("%s/2Lqg.%06d.jld2", directory, idx)
+    file = jldopen(filename_func(0))
+    F = file["params/F"]
+    U = file["params/U"]
+    close(file)
+    return (; F, U)
+end
+
+function load_2L_snapshot(directory, grid, params, snap_idx)
+    filename_func(idx) = @sprintf("%s/2Lqg.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("2Lqg.", file)])-1
+    num_snapshots = 0
+    file = nothing
+    file_idx = snap_idx
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        num_snapshots += length(keys(file["snapshots/t"]))
+        if snap_idx <= num_snapshots
+            break
+        end
+        file_idx -= length(keys(file["snapshots/t"]))
+        close(file)
+    end
+    key = keys(file["snapshots/t"])[file_idx]
+    t = file["snapshots/t/" * key]
+    qh = file["snapshots/sol/" * key]
+    ψh = zeros(Complex{Float64}, grid.nkr, grid.nl, 2)
+    streamfunctionfrompv!(ψh, qh, grid, params)
+
+    close(file)
+    return t, qh, ψh
+end
+
+function streamfunctionfrompv!(ψh, qh, grid, params)
+    ψ1h = @view ψh[:,:,1]
+    ψ2h = @view ψh[:,:,2]
+    q1h = @view qh[:,:,1]
+    q2h = @view qh[:,:,2]
+    
+    @. ψ1h = -(grid.Krsq * q1h + params.F * (q1h + q2h))
+    @. ψ2h = -(grid.Krsq * q2h + params.F * (q1h + q2h))
+    @. ψh /= grid.Krsq + 2*params.F
+    @. ψh *= grid.invKrsq
 end
 
 function compute_ω(k, f, Cg)
@@ -293,6 +347,24 @@ function get_diagnostics(directory)
     Z = file["diagnostics/enstrophy/data"]
     close(file)
     return (diag_t, KE, PE, Z)
+end
+
+function map_qgsw_snapshots(directory, map_function, array_result)
+    array_index = 1
+    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
+    file_idx = 1
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        for snapshot=keys(file["snapshots/t"])
+            t  =  file["snapshots/t/" * snapshot]
+            qh =  file["snapshots/sol/" * snapshot]
+            array_result[array_index] = map_function(t, qh)
+            array_index += 1
+        end
+        close(file)
+    end
+    return array_result
 end
 
 function map_snapshots(directory, map_function, array_result)

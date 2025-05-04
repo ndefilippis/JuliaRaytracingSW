@@ -2,11 +2,11 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=24
-#SBATCH --mem=64GB
-#SBATCH --time=01:30:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=12GB
+#SBATCH --time=05:59:00
 #SBATCH --job-name=rsw_f
-#SBATCH --array=1-64
+#SBATCH --array=11,12,15,16
 
 module purge
 
@@ -19,7 +19,7 @@ max_file=$(($(find $analysis_directory -name rsw.[0-9]*.jld2 | wc -l)-1))
 job_size=$(($max_K/$SLURM_ARRAY_TASK_COUNT))
 
 mkdir -p $rundir
-cp fourier-job.sbatch FourierRSW.jl README.txt $rundir
+cp config.sh fourier-job.sbatch FourierRSW.jl README.txt $rundir
 cp ../RSWUtils.jl $rundir
 cd $rundir
 

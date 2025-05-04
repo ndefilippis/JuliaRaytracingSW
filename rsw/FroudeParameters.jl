@@ -1,7 +1,7 @@
 module Parameters
     # Domain parameters
     L  = 2π
-    nx = 2048
+    nx = 1024
 
     # Equation parameters
     
@@ -18,8 +18,8 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 1100.
-    T = 1200.
+    spinup_T = 3100.
+    T = 3200.
     output_dt = 0.03
     diag_dt = 0.01
 

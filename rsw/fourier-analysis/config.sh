@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-analysis_directory=/scratch/nad9961/rsw/51962610/8
-max_K=256
+analysis_directory=/vast/nad9961/rsw/59916630/1
+max_K=1024

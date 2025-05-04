@@ -1,20 +1,33 @@
 module TwoLayerQG
+export 
+    Problem,
+    set_solution!,
+    enforce_reality_condition!,
+    updatevars!,
+    energy,
+    kinetic_energy,
+    potential_energy,
+    enstrophy
 
+using Revise
 using FourierFlows
-using FourierFlows: parsevalsum2
+using FourierFlows: parsevalsum2, parsevalsum, plan_flows_rfft
 using CUDA
-
+using StaticArrays
+using KernelAbstractions
 using LinearAlgebra: mul!, ldiv!
+
 using ..IFMAB3
 
 # Only implemented for equal layer heights
 
-struct Params{T} <: AbstractParams
+struct Params{T, Trfft} <: AbstractParams
     U :: T         # Background flow velocity
     μ :: T         # Linear bottom drag coefficient
     ν :: T         # Hyperviscosity coefficient
     nν :: Int       # Order of the hyperviscous operator
     F :: T         # Function of Rossby deformation wavenumber
+    rfftplan :: Trfft
 end
 
 struct Vars{Aphys, Atrans} <: AbstractVars
@@ -45,23 +58,31 @@ function Problem(dev::Device = CPU();
     ny = nx,
     Lx = 2π,
     Ly = Lx,
+    U = 0.5,
+    μ = 1e-2,
     ν = 1e-6,
     nν = 4,
-    Kd2 = 3.0,
+    f0 = 3.0,
+    Cg = 1.0,
+    δρρ0 = 0.2,
     stepper = "IFMAB3",
     dt = 5e-2,
     aliased_fraction = 1/3,
-    T = Float64,
+    T = Float32,
     use_filter=false,
     stepper_kwargs...)
 
+    A = device_array(dev)
     grid = TwoDGrid(dev; nx, Lx, ny, Ly, aliased_fraction, T)
-    params = Params{T}(U, μ, ν, nν, Kd2/2)
+    
+    rfftplanlayered = plan_flows_rfft(A{T, 3}(undef, grid.nx, grid.ny, 2), [1, 2])
+    
+    params = Params(T(U), T(μ), T(ν), nν, T(2*f0^2/Cg^2/δρρ0), rfftplanlayered)
     vars = Vars(grid)
     equation = Equation(params, grid)
     if stepper == "IFMAB3"
         clock = FourierFlows.Clock{T}(dt, 0, 0)
-        timestepper = IFMAB3TimeStepper(equation, dt, dev; diagonal=true, use_filter, stepper_kwargs...)
+        timestepper = IFMAB3TimeStepper(equation, dt, dev; diagonal=false, use_filter, stepper_kwargs...)
         sol = zeros(dev, equation.T, equation.dims)
         return FourierFlows.Problem(sol, clock, equation, grid, vars, params, timestepper)
     else
@@ -74,18 +95,20 @@ function pvfromstreamfunction!(qh, ψh, grid, params)
     ψ2h = @views ψh[:,:,2]
     q1h = @views qh[:,:,1]
     q2h = @views qh[:,:,2]
-    @. q1h = -grid.Krsq * ψh1 + params.F * (ψh2 - ψh1)
-    @. q2h = -grid.Krsq * ψh2 + params.F * (ψh1 - ψh2)
+    @. q1h = -grid.Krsq * ψ1h + params.F * (ψ2h - ψ1h)
+    @. q2h = -grid.Krsq * ψ2h + params.F * (ψ1h - ψ2h)
 end
 
 function streamfunctionfrompv!(ψh, qh, grid, params)
-    ψ1h = @views ψh[:,:,1]
-    ψ2h = @views ψh[:,:,2]
-    q1h = @views qh[:,:,1]
-    q2h = @views qh[:,:,2]
-    @. ψ1h = -grid.Krsq * qh1 - params.F * (qh2 + qh1)
-    @. ψ2h = -grid.Krsq * qh2 - params.F * (qh1 + qh2)
-    @. ψh /= grid.Krsq*(grid.Krsq + 2*params.F)
+    ψ1h = @view ψh[:,:,1]
+    ψ2h = @view ψh[:,:,2]
+    q1h = @view qh[:,:,1]
+    q2h = @view qh[:,:,2]
+    
+    @. ψ1h = -(grid.Krsq * q1h + params.F * (q1h + q2h))
+    @. ψ2h = -(grid.Krsq * q2h + params.F * (q1h + q2h))
+    @. ψh /= grid.Krsq + 2*params.F
+    @. ψh *= grid.invKrsq
 end
 
 function updatevars!(prob)
@@ -95,15 +118,23 @@ function updatevars!(prob)
     @. vars.qh = sol
     streamfunctionfrompv!(vars.ψh, vars.qh, grid, params)
     @. vars.ζh = -grid.Krsq * vars.ψh
-    @. vars.uh = -im * grid.l  * vars.ψh
-    @. vars.vh =  im * grid.kr * vars.ψh
+    @. vars.uh = -1im * grid.l  * vars.ψh
+    @. vars.vh =  1im * grid.kr * vars.ψh
 
-    ldiv!(vars.q, grid.rfftplan, deepcopy(vars.qh)) # use deepcopy() because irfft destroys its input
-    ldiv!(vars.ψ, grid.rfftplan, deepcopy(vars.ψh)) # use deepcopy() because irfft destroys its input
-    ldiv!(vars.ζ, grid.rfftplan, deepcopy(vars.ζh))
-    ldiv!(vars.u, grid.rfftplan, deepcopy(vars.uh))
-    ldiv!(vars.v, grid.rfftplan, deepcopy(vars.vh))
+    invtransform!(vars.q, deepcopy(vars.qh), params) # use deepcopy() because irfft destroys its input
+    invtransform!(vars.ψ, deepcopy(vars.ψh), params) # use deepcopy() because irfft destroys its input
+    invtransform!(vars.ζ, deepcopy(vars.ζh), params)
+    invtransform!(vars.u, deepcopy(vars.uh), params)
+    invtransform!(vars.v, deepcopy(vars.vh), params)
     return nothing
+end
+
+@inline function fwdtransform!(varh, var, params)
+    mul!(varh, params.rfftplan, var)
+end
+
+@inline function invtransform!(var, varh, params)
+    ldiv!(var, params.rfftplan, varh)
 end
 
 function enforce_reality_condition!(prob)
@@ -114,112 +145,110 @@ function enforce_reality_condition!(prob)
 
     updatevars!(prob)
         
-    mul!(vars.qh, grid.rfftplan, deepcopy(vars.q))
-    mul!(vars.ψh, grid.rfftplan, deepcopy(vars.ψ))
+    fwdtransform!(vars.qh, deepcopy(vars.q), prob.params)
+    fwdtransform!(vars.ψh, deepcopy(vars.ψ), prob.params)
     return nothing
 end
 
 function calcN!(N, sol, t, clock, vars, params, grid)
     dealias!(sol, grid)
-
-    @. vars.qh = sol
-    streamfunctionfrompv(vars.ψh, vars.qh, grid, params)
-    qh = vars.ζh # Use ζh as a temporary variable
-    @. qh = vars.qh
-    ldiv!(vars.q, grid.rfftplan, qh)
     
+    @. vars.qh = sol
+    streamfunctionfrompv!(vars.ψh, vars.qh, grid, params)
+    qh = vars.ζh
+    @. qh = vars.qh
+    invtransform!(vars.q, qh, params)
+
     # Use ζ and ζh as scratch variables
+    # Calculate advective terms
+    # q_t = -J(ψ, q)
+    # Use the fact that J(f, g) = (f_xg)_y - (f_yg)_x
     ψxqh = vars.ζh
     ψxq = vars.ζ
     @. ψxqh = 1im * grid.kr * vars.ψh
-    ldiv!(ψxq, grid.rfftplan, ψxqh)
+    invtransform!(ψxq, ψxqh, params)
     @. ψxq *= vars.q
-    mul!(ψxqh, grid.rfftplan, ψxq)
+    fwdtransform!(ψxqh, ψxq, params)
     @. N = -1im * grid.l * ψxqh
 
     ψyqh = vars.ζh
     ψyq = vars.ζ
     @. ψyqh = 1im * grid.l * vars.ψh
-    ldiv!(ψyq, grid.rfftplan, ψyqh)
+    invtransform!(ψyq, ψyqh, params)
     @. ψyq *= vars.q
-    mul!(ψyqh, grid.rfftplan, ψyq)
+    fwdtransform!(ψyqh, ψyq, params)
     @. N += 1im * grid.kr * ψyqh
 
     return nothing
+end
+
+@kernel function L_kernel!(L, k, l, F, U, μ, D)
+    i, j = @index(Global, NTuple)   
+    K2 = k[i]^2 + l[j]^2
+    K2inv = K2 == 0 ? 0 : 1.0/K2
+    
+    PV_term = SVector{2,Complex{Float32}}(-2im*k[i]*F*U, 2im*k[i]*F*U)
+    drag_term = SVector{2,Complex{Float32}}(0, μ*K2)
+    psi_terms = PV_term + drag_term
+            
+    Sinv = SMatrix{2,2,Complex{Float32}}(-K2-F, -F, -F, -K2-F)/(K2+2*F)*K2inv
+    
+    @inbounds @view(L[i, j, :, :]) .= psi_terms .* Sinv
+    L[i, j, 1, 1] += -1im*k[i]*U + D[i,j]
+    L[i, j, 2, 2] +=  1im*k[i]*U + D[i,j]
+end
+
+function populate_L!(L, grid, params)
+    D = @. - params.ν * grid.Krsq^(params.nν)
+
+    backend = KernelAbstractions.get_backend(L)
+    kernel! = L_kernel!(backend)
+    kernel!(L, grid.kr, grid.l, params.F, params.U, params.μ, D, ndrange=size(grid.Krsq))
 end
 
 function Equation(params, grid)
     T = eltype(grid)
     dev = grid.device
 
-    # For the standard diagonal problem
-    D = @. - params.ν * grid.Krsq^(params.nν)
-    L = zeros(dev, T, (grid.nkr, grid.nl, 2))
-    L .= D          # Hyperviscous dissipation
-
-    L1 = @views L[:, :, 1]
-    L2 = @views L[:, :, 2]
-    L1 .+= 1im * params.U * grid.kr                 # Add mean-flow advection
-    L2 .+= -1im * params.U * grid.kr .- params.μ    # Add bottom drag and mean-flow advection
-    return FourierFlows.Equation(L, calcN!, grid)
+    L = zeros(dev, Complex{T}, (grid.nkr, grid.nl, 2, 2))
+    backend = get_backend(L)
+    populate_L!(L, grid, params)
+    KernelAbstractions.synchronize(backend)
+    
+    return FourierFlows.Equation(L, calcN!, grid, dims=(grid.nkr, grid.nl, 2))
 end
 
-function set_solution!(prob, ψ0h)
+function set_solution!(prob, q0h)
     vars, grid, sol = prob.vars, prob.grid, prob.sol
 
     A = typeof(vars.qh) # determine the type of vars.uh
-    pvfromstreamfunction!(vars.qh, A(ψ0h), grid, prob.params)
-
-    @. sol = vars.qh
+    sol .= A(q0h)
     updatevars!(prob)
 
     return nothing
 end
 
-@inline kinetic_energy(prob) = kinetic_energy(prob.sol, prob.vars, prob.params, prob.grid)
-
-function kinetic_energy(sol, vars, params, grid)
-  streamfunctionfrompv!(vars.ψh, sol, grid, params)
-  @. vars.uh = sqrt.(grid.Krsq) * vars.ψh      # vars.uh is a dummy variable
-
-  return parsevalsum2(vars.uh , grid) / (2 * grid.Lx * grid.Ly)
-end
-
-
-@inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)
-
-function potential_energy(sol, vars, params, grid)
-  streamfunctionfrompv!(vars.ψh, sol, grid, params)
-
-  return params.Kd2 * parsevalsum2(vars.ψh, grid) / (2 * grid.Lx * grid.Ly)
-end
-
-@inline energy(prob) = energy(prob.sol, prob.vars, prob.params, prob.grid)
-
-@inline energy(sol, vars, params, grid) = kinetic_energy(sol, vars, params, grid) + potential_energy(sol, vars, params, grid)
-
-function enstrophy(sol, vars, params, grid)
+function kinetic_energy(vars, params, grid, sol)
   @. vars.qh = sol
-  return parsevalsum2(vars.qh, grid) / (2 * grid.Lx * grid.Ly)
+  streamfunctionfrompv!(vars.ψh, vars.qh, grid, params)
+
+  abs²∇𝐮h = vars.uh        # use vars.uh as scratch variable
+  @. abs²∇𝐮h = grid.Krsq * abs2(vars.ψh)
+
+  KE_1 = parsevalsum(@views(abs²∇𝐮h[:,:,1]) , grid) / (grid.Lx * grid.Ly) # factor 2 cancels out via H/2
+  KE_2 = parsevalsum(@views(abs²∇𝐮h[:,:,2]) , grid) / (grid.Lx * grid.Ly)
+  return (KE_1, KE_2)
 end
 
-@inline enstrophy(prob) = enstrophy(prob.sol, prob.vars, prob.params, prob.grid)
+@inline kinetic_energy(prob) = kinetic_energy(prob.vars, prob.params, prob.grid, prob.sol)
 
-@inline energy_dissipation(prob) = energy_dissipation(prob.sol, prob.vars, prob.params, prob.grid)
-
-@inline function energy_dissipation(sol, vars, params, grid)
-  energy_dissipationh = vars.uh # use vars.uh as scratch variable
-
-  @. energy_dissipationh = params.ν * grid.Krsq^(params.nν-1) * abs2(sol)
-  return 1 / (grid.Lx * grid.Ly) * parsevalsum(energy_dissipationh, grid)
+function potential_energy(vars, params, grid, sol)
+  @. vars.qh = sol
+  streamfunctionfrompv!(vars.ψh, vars.qh, grid, params)
+    
+  PE = 1 / (2 * grid.Lx * grid.Ly) * params.F * parsevalsum(abs2.(view(vars.ψh, :, :, 1) .- view(vars.ψh, :, :, 2)), grid)
+  return PE
 end
 
-@inline enstrophy_dissipation(prob) = enstrophy_dissipation(prob.sol, prob.vars, prob.params, prob.grid)
-
-@inline function enstrophy_dissipation(sol, vars, params, grid)
-  enstrophy_dissipationh = vars.uh # use vars.uh as scratch variable
-
-  @. enstrophy_dissipationh = params.ν * grid.Krsq^params.nν * abs2(sol)
-  return 1 / (grid.Lx * grid.Ly) * parsevalsum(enstrophy_dissipationh, grid)
-end
+@inline potential_energy(prob) = potential_energy(prob.vars, prob.params, prob.grid, prob.sol)
 end

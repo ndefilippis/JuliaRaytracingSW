@@ -28,7 +28,7 @@ function set_shafer_initial_condition_QG!(prob, Kg, ag)
 end
 
 function initialize_problem()
-    dev = GPU()
+    dev = CPU()
     Lx=Parameters.L
     nx=Parameters.nx
     dx=Lx/nx

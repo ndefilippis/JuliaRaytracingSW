@@ -320,16 +320,16 @@ function set_solution!(prob, u0h, v0h, η0h)
 end
 
 function kinetic_energy(uh, vh, grid)
-    return parsevalsum2(vars.uh , grid) / (2 * grid.Lx * grid.Ly) + parsevalsum2(vars.vh , grid) / (2 * grid.Lx * grid.Ly)
+    return parsevalsum2(uh , grid) / (2 * grid.Lx * grid.Ly) + parsevalsum2(vh , grid) / (2 * grid.Lx * grid.Ly)
 end
 @inline kinetic_energy(prob) = kinetic_energy(prob.sol, prob.vars, prob.params, prob.grid)
-@inline kinetic_energy(sol, vars, params, grid) = kinetic_energy(prob.vars.uh, prob.vars.vh, prob.grid)
+@inline kinetic_energy(sol, vars, params, grid) = kinetic_energy(vars.uh, vars.vh, grid)
 
 function potential_energy(ηh, params, grid)
-  return params.Cg2 * parsevalsum2(vars.ηh, grid) / (grid.Lx * grid.Ly)
+  return params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
 end
 @inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)
-@inline potential_energy(sol, vars, params, grid) = potential_energy(prob.vars.ηh, prob.grid, prob.params)
+@inline potential_energy(sol, vars, params, grid) = potential_energy(vars.ηh, params, grid)
 
 @inline energy(prob) = energy(prob.sol, prob.vars, prob.params, prob.grid)
 @inline energy(sol, vars, params, grid) = kinetic_energy(sol, vars, params, grid) + potential_energy(sol, vars, params, grid)

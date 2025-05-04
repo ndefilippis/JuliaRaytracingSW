@@ -1,1 +1,1 @@
-Fourier analysis of SWQG run
+Running with 10x bigger window

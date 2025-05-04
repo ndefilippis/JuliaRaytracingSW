@@ -1,1 +1,1 @@
-Run with 16x wavepackets
+Running raytracing with 3x the background velocity

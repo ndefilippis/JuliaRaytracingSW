@@ -19,7 +19,7 @@ function frequency_filters(N)
     
 end
 
-function read_frequency_file_to_radial_data(radii, weight_matrix, fft_directory, output_file)  
+function read_frequency_file_to_radial_data(radii, k_max, weight_matrix, fft_directory, output_file)  
     initial_data_file = jldopen(@sprintf("%s/1/radial_data_k=001.jld2", fft_directory))
     N = length(initial_data_file["t"])
     t = initial_data_file["t"]
@@ -29,14 +29,12 @@ function read_frequency_file_to_radial_data(radii, weight_matrix, fft_directory,
     C0_data = zeros(N, length(radii))
     Cp_data = zeros(N, length(radii))
     Cn_data = zeros(N, length(radii))
-
-    k_max = 256
     
     for k_idx=1:k_max
         data_file = nothing
         filename = @sprintf("%s/%d/radial_data_k=%03d.jld2", fft_directory, ceil(Int,k_idx/4), k_idx)
         
-        if !isfile(filename) 
+        if !isfile(filename) || k_idx == 11 || k_idx == 15 # Skip weird files
             println("Missing file: " * filename)
             continue
         end
@@ -72,7 +70,7 @@ end
 
 function create_total_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω, ax, label, color_idx)
     N_neg, N_half, N_pos = frequency_filters(N)
-    K_max = 256
+    K_max = grid.nkr
     K_d = f0/sqrtgH
     
     C0_ndata = (C0_data) * grid.dx / grid.nx
@@ -87,7 +85,7 @@ end
 
 function create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω)
     N_neg, N_half, N_pos = frequency_filters(N)
-    K_max = 256
+    K_max = grid.nkr
     K_d = f0/sqrtgH
     
     C0_ndata = (C0_data) * grid.dx / grid.nx
@@ -216,21 +214,28 @@ function start!()
     save(@sprintf("images/total_spectrum_run=%s.png", "57410496"), total_fig)
 end
 
-function make_all_images!()
-    grid = TwoDGrid(; Lx=2π, nx=512)
-    radii, weight_matrix = create_radialspectrum_weights(grid, 3);
-    for run_idx=5:12
-        sqrtgH = 0.35 + run_idx * 0.05
-        f0 = 3.0 * sqrtgH
-        fft_directory = @sprintf("/scratch/nad9961/rsw_fourier/57410496/%d", run_idx)
-        output_file = @sprintf("/scratch/nad9961/rsw_fourier/57410496/%d/all_radial_data.jld2", run_idx)
-        N, ω, C0_data, Cp_data, Cn_data = read_frequency_file_to_radial_data(radii, weight_matrix, fft_directory, output_file)
-        
-        fig1, fig2 = create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω)
+function read_from_radial_data_file(radial_data_directory)
+    input = jldopen(radial_data_directory)
+    C0_data = input["C0"]
+    Cp_data = input["Cp"] 
+    Cn_data = input["Cn"]
+    ω = input["ω"]
+    N = length(ω)
+    close(input)
+    return N, ω, C0_data, Cp_data, Cn_data
+end
 
-        save(@sprintf("images/KOmega_spectrum_run=%s_idx=%d.png", "57410496", run_idx), fig1)
-        save(@sprintf("images/Omega_spectrum_run=%s_idx=%d.png", "57410496", run_idx), fig2)
-    end
+function make_images!(fft_directory, key_name, grid_size, f0, sqrtgH)
+    grid = TwoDGrid(; Lx=2π, nx=grid_size)
+    radii, weight_matrix = create_radialspectrum_weights(grid, 3);
+    output_file = @sprintf("%s/all_radial_data.jld2", fft_directory)
+    N, ω, C0_data, Cp_data, Cn_data = read_frequency_file_to_radial_data(radii, grid.nkr, weight_matrix, fft_directory, output_file)
+    #N, ω, C0_data, Cp_data, Cn_data = read_from_radial_data_file(@sprintf("%s/all_radial_data.jld2", fft_directory))
+    
+    fig1, fig2 = create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω)
+
+    save(@sprintf("images/KOmega_spectrum_run=%s.png", key_name), fig1)
+    save(@sprintf("images/Omega_spectrum_run=%s.png", key_name), fig2)
 end
 
 start!()

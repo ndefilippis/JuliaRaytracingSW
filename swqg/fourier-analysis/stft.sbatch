@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=64GB
+#SBATCH --mem=80GB
 #SBATCH --time=01:30:00
 #SBATCH --job-name=rsw_f
 #SBATCH --array=1-64
@@ -19,9 +19,9 @@ max_file=$(($(find $analysis_directory -name qgsw.[0-9]*.jld2 | wc -l)-1))
 job_size=$(($max_K/$SLURM_ARRAY_TASK_COUNT))
 
 mkdir -p $rundir
-cp config.sh fourier-job.sbatch FourierSWQG.jl README.txt $rundir
+cp config.sh stft.sbatch ShortTimeFourierSWQG.jl README.txt $rundir
 cd $rundir
 
-julia -t $SLURM_CPUS_PER_TASK FourierSWQG.jl $analysis_directory $max_file $SLURM_ARRAY_TASK_ID $job_size > run.log
+julia -t $SLURM_CPUS_PER_TASK ShortTimeFourierSWQG.jl $analysis_directory $max_file $SLURM_ARRAY_TASK_ID $job_size $window_size > run.log
 
 exit

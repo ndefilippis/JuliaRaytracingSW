@@ -3,28 +3,28 @@ using CUDA, OrdinaryDiffEq
 
 export Velocity, VelocityGradient, raytrace!, interpolate_velocity!, interpolate_gradients!, create_template_ode
 
-struct Velocity
-    u::CuArray{Float32, 2}
-    v::CuArray{Float32, 2}
+struct Velocity{T<:AbstractFloat}
+    u::CuArray{T, 2}
+    v::CuArray{T, 2}
 end
 
-struct VelocityGradient
-    ux::CuArray{Float32, 2}
-    uy::CuArray{Float32, 2}
-    vx::CuArray{Float32, 2}
-    vy::CuArray{Float32, 2}
+struct VelocityGradient{T<:AbstractFloat}
+    ux::CuArray{T, 2}
+    uy::CuArray{T, 2}
+    vx::CuArray{T, 2}
+    vy::CuArray{T, 2}
 end
 
 @inline function normalize_to_texture_coords(x, x0, L, nx)
     return (x - x0) / L + 0.5 / nx
 end
 
-@inline function dispersion_relation(k, l, f, Cg)::Float32
+@inline function dispersion_relation(k, l, f, Cg)
     return sqrt(f^2 + Cg^2*(k^2 + l^2))
 end
 
 
-@inline function dispersion_relation(k, l, f, Cg, pos_neg)::Float32
+@inline function dispersion_relation(k, l, f, Cg, pos_neg)
     return pos_neg * sqrt(f^2 + Cg^2*(k^2 + l^2))
 end
 
@@ -50,17 +50,17 @@ function dxkdt(dxk, xk, p, t)
     dk2 = @views dxk[:, 4]
     
     broadcast!(dx1, nx, ny, Cg_x, Ref(p.U1), Ref(p.U2), alpha) do xi, yi, cgx, U1, U2, alpha
-        alpha * U1[xi, yi] + (1.0f0 - alpha) * U2[xi, yi] + cgx
+        alpha * U1[xi, yi] + (1.0 - alpha) * U2[xi, yi] + cgx
     end
     broadcast!(dx2, nx, ny, Cg_y, Ref(p.V1), Ref(p.V2), alpha) do xi, yi, cgy, V1, V2, alpha
-        alpha * V1[xi, yi] + (1.0f0 - alpha) * V2[xi, yi] + cgy
+        alpha * V1[xi, yi] + (1.0 - alpha) * V2[xi, yi] + cgy
     end
     
     broadcast!(dk1, nx, ny, k1, k2, Ref(p.Ux1), Ref(p.Vx1), Ref(p.Ux2), Ref(p.Vx2), alpha) do xi, yi, k, l, Ux1, Vx1, Ux2, Vx2, alpha
-        -alpha * (Ux1[xi, yi] * k + Vx1[xi, yi] * l) + (alpha - 1.0f0) * (Ux2[xi, yi] * k + Vx2[xi, yi] * l)
+        -alpha * (Ux1[xi, yi] * k + Vx1[xi, yi] * l) + (alpha - 1.0) * (Ux2[xi, yi] * k + Vx2[xi, yi] * l)
     end
     broadcast!(dk2, nx, ny, k1, k2, Ref(p.Uy1), Ref(p.Ux1), Ref(p.Uy2), Ref(p.Ux2), alpha) do xi, yi, k, l, Uy1, negVy1, Uy2, negVy2, alpha
-        -alpha * (Uy1[xi, yi] * k - negVy1[xi, yi] * l) + (alpha - 1.0f0) * (Uy2[xi, yi] * k - negVy2[xi, yi] * l)
+        -alpha * (Uy1[xi, yi] * k - negVy1[xi, yi] * l) + (alpha - 1.0) * (Uy2[xi, yi] * k - negVy2[xi, yi] * l)
     end
 end
 
@@ -109,11 +109,11 @@ function interpolate_gradients!(gradient::VelocityGradient, positions, grid, out
 end
 
 function create_template_ode(wavepacket_array)
-    return ODEProblem(dxkdt, wavepacket_array, (0.0f0, 1.0f0), (0.0f0, )) # Place-holder ODE template
+    return ODEProblem(dxkdt, wavepacket_array, (0.0, 1.0), (0.0, )) # Place-holder ODE template
 end
 
 function raytrace!(ode_template, velocity1::Velocity, velocity2::Velocity, gradient1::VelocityGradient, gradient2::VelocityGradient, 
-        grid, wavepacket_array, dt, tspan::Tuple{Float32, Float32}, params)
+        grid, wavepacket_array, dt, tspan::Tuple{T, T}, params) where {T<:AbstractFloat}
     
     texU1  = CuTexture(velocity1.u;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
     texV1  = CuTexture(velocity1.v;  interpolation=CUDA.LinearInterpolation(), address_mode=CUDA.ADDRESS_MODE_WRAP, normalized_coordinates=true)
@@ -134,7 +134,7 @@ function raytrace!(ode_template, velocity1::Velocity, velocity2::Velocity, gradi
         t0 = tspan[1], t1 = tspan[2])
     prob = remake(ode_template; u0=wavepacket_array, tspan=tspan, p=ode_params)
 
-    sol = solve(prob, Vern7(), save_start=false, save_on=false)
+    sol = solve(prob, Vern7(), save_start=false, save_on=false, force_dtmin=true)
 
     # Copy solution to the original destination
     wavepacket_array .= first(sol.u)

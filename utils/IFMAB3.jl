@@ -29,13 +29,13 @@ function getexpLs(dt, equation, dev::CPU)
     return expLdt, exp2Ldt
 end
 
-function kernel_exp(result, A, dt, Nx, Ny)
+function kernel_exp(result, A, dt, Nx, Ny, ::Val{N}) where N
     i = blockDim().x * (blockIdx().x - 1) + threadIdx().x
     j = blockDim().y * (blockIdx().y - 1) + threadIdx().y
     if i > Nx || j > Ny
         return
     end
-    @inbounds Lkj = SMatrix{3, 3, Complex{Float64}}(@view(A[i, j, :, :]))
+    @inbounds Lkj = SMatrix{N, N, Complex{Float64}}(@view(A[i, j, :, :]))
     @inbounds @view(result[i, j, :, :]) .= CUDA.exp(dt * Lkj)
     return
 end
@@ -44,11 +44,13 @@ end
 function getexpLs(dt, equation, dev::GPU)
     Nx = size(equation.L, 1)
     Ny = size(equation.L, 2)
-
+    
     expLdt = similar(equation.L)
     exp2Ldt = similar(equation.L)
 
-    config_kernel = @cuda launch=false kernel_exp(expLdt, equation.L, dt, Nx, Ny)
+    eq_dims = Val(size(equation.L, 3))
+
+    config_kernel = @cuda launch=false kernel_exp(expLdt, equation.L, dt, Nx, Ny, eq_dims)
     max_threads = CUDA.maxthreads(config_kernel)
     
     thread_size = 2^(floor(Int, log2(max_threads)/2))
@@ -57,8 +59,8 @@ function getexpLs(dt, equation, dev::GPU)
     num_blocks_x = cld(Nx, num_threads_x)
     num_blocks_y = cld(Ny, num_threads_y)
     CUDA.@sync begin
-        @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) kernel_exp(expLdt, equation.L, dt, Nx, Ny)
-        @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) kernel_exp(exp2Ldt, equation.L, 2*dt, Nx, Ny)
+        @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) kernel_exp(expLdt, equation.L, dt, Nx, Ny, eq_dims)
+        @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) kernel_exp(exp2Ldt, equation.L, 2*dt, Nx, Ny, eq_dims)
     end
     return expLdt, exp2Ldt
 end
@@ -85,14 +87,14 @@ function IFMAB3TimeStepper(equation::FourierFlows.Equation, dt, dev::Device=CPU(
     return IFMAB3TimeStepper(expLdt, exp2Ldt, N₋₂, N₋₁, N, expLdtN₋₁, exp2LdtN₋₂, filter)
 end
 
-function mv_mul_kernel(y, A, x, Nx, Ny)
+function mv_mul_kernel(y, A, x, Nx, Ny, ::Val{N}) where N
     i = blockDim().x * (blockIdx().x - 1) + threadIdx().x
     j = blockDim().y * (blockIdx().y - 1) + threadIdx().y
     if i > Nx || j > Ny
         return
     end
-    @inbounds Lkj = SMatrix{3, 3}(@view(A[i, j, :, :]))
-    @inbounds xkj = SVector{3}(@view(x[i, j, :]))
+    @inbounds Lkj = SMatrix{N, N}(@view(A[i, j, :, :]))
+    @inbounds xkj = SVector{N}(@view(x[i, j, :]))
     @inbounds @view(y[i, j, :]) .= Lkj * xkj
     return
 end
@@ -101,18 +103,23 @@ function mvmul!(y, A::AbstractArray{T, 2}, x) where {T}
     @. y = A * x
 end
 
+function mvmul!(y, A::AbstractArray{T, 3}, x) where {T}
+    @. y = A * x
+end
+
 function mvmul!(y, A::CuArray{T, 4}, x) where {T}
     Nx = size(x, 1)
     Ny = size(x, 2)
+    eq_dims = Val{size(x,3)}()
     
-    config_kernel = @cuda launch=false mv_mul_kernel(y, A, x, Nx, Ny)
+    config_kernel = @cuda launch=false mv_mul_kernel(y, A, x, Nx, Ny, eq_dims)
     max_threads = CUDA.maxthreads(config_kernel)
     thread_size = 2^(floor(Int, log2(max_threads)/2))
     num_threads_x = min(thread_size, Nx)
     num_threads_y = min(thread_size, Ny)
     num_blocks_x = cld(Nx, num_threads_x)
     num_blocks_y = cld(Ny, num_threads_y)
-    @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) mv_mul_kernel(y, A, x, Nx, Ny)
+    @cuda threads=(num_threads_x, num_threads_y) blocks=(num_blocks_x, num_blocks_y) mv_mul_kernel(y, A, x, Nx, Ny, eq_dims)
 end
 
 function mvmul!(y, A::Array{T, 4}, x) where {T}
