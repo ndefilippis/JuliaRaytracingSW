@@ -16,7 +16,7 @@ source config.sh
 
 rundir=$SCRATCH/rsw_fourier/${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 max_file=$(($(find $analysis_directory -name rsw.[0-9]*.jld2 | wc -l)-1))
-job_size=$(($max_K/$SLURM_ARRAY_TASK_COUNT))
+job_size=$(($max_K/$num_tasks))
 
 mkdir -p $rundir
 cp config.sh fourier-job.sbatch FourierRSW.jl README.txt $rundir
