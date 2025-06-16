@@ -4,7 +4,8 @@ export
   set_solution!,
   enforce_reality_condition!,
   updatevars!,
-  energy,
+  kinetic_energy,
+  potential_energy,
   wave_balanced_decomposition
 
 using FourierFlows
@@ -195,7 +196,7 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     mul!(vuyh, grid.rfftplan, vuy)   # Convert back to spectral space
     @. uhN += -vuyh
 
-    # u * v 
+    # u * vx 
     uvx = vars.ζ
     uvxh  = vars.ζh
     @. uvxh = 1im * grid.kr * vars.vh # Store vx
@@ -326,7 +327,7 @@ end
 @inline kinetic_energy(sol, vars, params, grid) = kinetic_energy(vars.uh, vars.vh, grid)
 
 function potential_energy(ηh, params, grid)
-  return params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
+  return 0.5 * params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
 end
 @inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)
 @inline potential_energy(sol, vars, params, grid) = potential_energy(vars.ηh, params, grid)

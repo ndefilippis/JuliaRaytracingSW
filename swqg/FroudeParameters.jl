@@ -20,13 +20,15 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 400.
-    T = 70000.
-    output_dt = 10.0
-    diag_dt = 0.5
 
-    max_writes = 3000
-    base_filename = "qgsw"
+    T = parse(Float32, ARGS[4])
+    spinup_T = T/10.0
+
+    output_dt = 10.0/f
+    diag_dt = 0.5/f
+
+    max_writes = 500
+    base_filename = "swqg"
 
     # Initial condition parameters
     Kg = (10, 13)
@@ -36,11 +38,11 @@ module Parameters
     packet_base_filename = "packets"
     use_stationary_background_flow = false
     write_gradients = true
-    packet_max_writes = 5000
+    packet_max_writes = 3000
     packet_output_dt = 1.0;
 
     # Wavepackets parameters
-    sqrtNpackets = 512; # Square root of the number of wavepackets;
+    sqrtNpackets = 256; # Square root of the number of wavepackets;
     Npackets = sqrtNpackets^2;
     ω0 = sqrt(f^2 + Cg^2 * parse(Float32, ARGS[2])^2); # How close to f the initial wavepacket frequencies are
     k_cutoff = 1000*f/Cg # The wavenumber that we reset a off a wavepacket

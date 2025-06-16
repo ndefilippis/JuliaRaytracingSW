@@ -45,9 +45,17 @@ function compute_balanced_wave_bases(grid, params)
     return Φ₀, Φ₊, Φ₋
 end
 
-function compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋)
-    c₀ = uh.*conj(Φ₀[:,:,u_INDEX]) + vh.*conj(Φ₀[:,:,v_INDEX]) + ηh.*conj(Φ₀[:,:,η_INDEX])
-    c₊ = uh.*conj(Φ₊[:,:,u_INDEX]) + vh.*conj(Φ₊[:,:,v_INDEX]) + ηh.*conj(Φ₊[:,:,η_INDEX])
-    c₋ = uh.*conj(Φ₋[:,:,u_INDEX]) + vh.*conj(Φ₋[:,:,v_INDEX]) + ηh.*conj(Φ₋[:,:,η_INDEX])
+function compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋, params)
+    Cg = sqrt(params.Cg2)
+    c₀ = uh.*conj(Φ₀[:,:,u_INDEX]) + vh.*conj(Φ₀[:,:,v_INDEX]) + Cg*ηh.*conj(Φ₀[:,:,η_INDEX])
+    c₊ = uh.*conj(Φ₊[:,:,u_INDEX]) + vh.*conj(Φ₊[:,:,v_INDEX]) + Cg*ηh.*conj(Φ₊[:,:,η_INDEX])
+    c₋ = uh.*conj(Φ₋[:,:,u_INDEX]) + vh.*conj(Φ₋[:,:,v_INDEX]) + Cg*ηh.*conj(Φ₋[:,:,η_INDEX])
     return c₀, c₊, c₋
+end
+
+function compute_rsw_fields(c₀, c₊, c₋, Φ₀, Φ₊, Φ₋, params)
+    uh = c₀.*Φ₀[:,:,u_INDEX] + c₊.*Φ₊[:,:,u_INDEX] + c₋.*Φ₋[:,:,u_INDEX]
+    vh = c₀.*Φ₀[:,:,v_INDEX] + c₊.*Φ₊[:,:,v_INDEX] + c₋.*Φ₋[:,:,v_INDEX]
+    Cg_ηh = c₀.*Φ₀[:,:,η_INDEX] + c₊.*Φ₊[:,:,η_INDEX] + c₋.*Φ₋[:,:,η_INDEX]
+    return uh, vh, Cg_ηh/sqrt(params.Cg2)
 end

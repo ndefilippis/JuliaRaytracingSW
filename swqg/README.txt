@@ -1,1 +1,1 @@
-Running raytracing with 3x the background velocity
+Long two layer run with large dissipation to test spectral energy lux code

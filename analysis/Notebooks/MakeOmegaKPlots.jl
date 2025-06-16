@@ -34,7 +34,7 @@ function read_frequency_file_to_radial_data(radii, k_max, weight_matrix, fft_dir
         data_file = nothing
         filename = @sprintf("%s/%d/radial_data_k=%03d.jld2", fft_directory, ceil(Int,k_idx/4), k_idx)
         
-        if !isfile(filename) || k_idx == 11 || k_idx == 15 # Skip weird files
+        if !isfile(filename)
             println("Missing file: " * filename)
             continue
         end
@@ -91,33 +91,37 @@ function create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_da
     C0_ndata = (C0_data) * grid.dx / grid.nx
     Cp_ndata = (Cp_data) * grid.dx / grid.nx
     Cn_ndata = (Cn_data) * grid.dx / grid.nx
+    W_data = Cp_ndata + Cn_ndata
     T_ndata  = C0_ndata + Cp_ndata + Cn_ndata
-    data_order = [C0_ndata, Cp_ndata, Cn_ndata, T_ndata]
+    data_order = [C0_ndata, Cp_ndata, Cn_ndata, W_data, T_ndata]
     
-    fig_ωk = Figure(size=(2400, 1800), fontsize=32)
-    Label(fig_ωk[-1, 1:4], "RSW Power Spectrum")
+    fig_ωk = Figure(size=(3000, 1800), fontsize=32)
+    fig_total_wave = Figure(size=(800, 800), fontsize=32)
+    
+    Label(fig_ωk[-1, 1:5], "RSW Power Spectrum")
     Label(fig_ωk[0, 1], "Geostrophic")
     Label(fig_ωk[0, 2], "Positive waves")
     Label(fig_ωk[0, 3], "Negative waves")
-    Label(fig_ωk[0, 4], "Total")
+    Label(fig_ωk[0, 4], "All waves")
+    Label(fig_ωk[0, 5], "Total")
     axis_ωk_options = (xscale=log10, yscale=log10,
         xticks = [1, 10], yticks=[1, 10, 100],
         xminorticks=IntervalsBetween(10), yminorticks=IntervalsBetween(10),
-        limits=(((radii[1])/K_d, radii[end]/K_d), (ω[N_half+1]/f0, 4*ω[end]/f0)),
+        limits=(((radii[1])/K_d, radii[end]/K_d), (ω[N_half+1]/f0, ω[end]/f0)),
         xminorticksvisible = true, yminorticksvisible = true)
 
     fig_sum = Figure(size=(2400, 1800), fontsize=32)
-    Label(fig_sum[-1, 1:4], "RSW Power Spectrum")
+    Label(fig_sum[-1, 1:5], "RSW Power Spectrum")
     Label(fig_sum[0, 1], "Geostrophic")
     Label(fig_sum[0, 2], "Positive waves")
     Label(fig_sum[0, 3], "Negative waves")
-    Label(fig_sum[0, 4], "Total")
+    Label(fig_sum[0, 4], "All waves")
+    Label(fig_sum[0, 5], "Total")
     axis_sum_options = (xscale=log10, yscale=log10,
        limits=((ω[N_half+1]/f0, 4*ω[end]/f0), (1e2, 1e10)),
         xticks = [0.1, 1, 10, 100])
     
-    
-    for data_type = 1:4
+    for data_type = 1:5
         y_data = ω[N_pos]/f0
         ω10_idx = findfirst(>=(2), y_data)
         x_data = (radii[1:end])/K_d
@@ -151,6 +155,7 @@ function create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_da
                 axis_ωk.xlabel = rich("K/K", subscript("d"))
                 axis_sum.xlabel = "ω/f"
             end
+            
             cf = contourf!(axis_ωk, x_data, y_data, log.(data'), colormap=:haline, levels=levels, extendlow = :auto, extendhigh = :auto)
             summed_data = sum(data, dims=2)[:]
             lines!(axis_sum, y_data, summed_data, linewidth=3)
@@ -158,26 +163,35 @@ function create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_da
             coefficient = summed_data[ω10_idx]/(y_data[ω10_idx])^(-2.00)
             lines!(axis_sum, y_data, coefficient*y_data.^(-2.00), linestyle=:dash, color="black", linewidth=3)
 
+            if(data_type == 4 && freq_sign == 3)
+                axis_total_wave = Axis(fig_total_wave[1, 1]; xlabel="|ω|/f", ylabel="E(|ω|)", axis_sum_options...)
+                lines!(axis_total_wave, y_data, summed_data, linewidth=3)
+                lines!(axis_total_wave, y_data, coefficient*y_data.^(-2.00), linestyle=:dash, color="black", linewidth=3)
+            end
+
             if(freq_sign == 1)
-                cb = Colorbar(fig_ωk[4, data_type], cf, vertical = false)
+                cb = Colorbar(fig_ωk[5, data_type], cf, vertical = false)
             end
             lines!(axis_ωk, x_data, sqrt.(f0^2 .+ (sqrtgH * K_d*(x_data)).^2)/f0, linestyle=:dash, color="black", alpha=0.75)
         end
+        
     end
     
     colsize!(fig_ωk.layout, 1, Aspect(1, 1.0))
     colsize!(fig_ωk.layout, 2, Aspect(1, 1.0))
     colsize!(fig_ωk.layout, 3, Aspect(1, 1.0))
     colsize!(fig_ωk.layout, 4, Aspect(1, 1.0))
+    colsize!(fig_ωk.layout, 5, Aspect(1, 1.0))
     resize_to_layout!(fig_ωk)
 
     colsize!(fig_sum.layout, 1, Aspect(1, 1.0))
     colsize!(fig_sum.layout, 2, Aspect(1, 1.0))
     colsize!(fig_sum.layout, 3, Aspect(1, 1.0))
     colsize!(fig_sum.layout, 4, Aspect(1, 1.0))
+    colsize!(fig_sum.layout, 5, Aspect(1, 1.0))
     resize_to_layout!(fig_sum)
     
-    return fig_ωk, fig_sum
+    return fig_ωk, fig_sum, fig_total_wave
 end
 
 function start!()
@@ -229,13 +243,12 @@ function make_images!(fft_directory, key_name, grid_size, f0, sqrtgH)
     grid = TwoDGrid(; Lx=2π, nx=grid_size)
     radii, weight_matrix = create_radialspectrum_weights(grid, 3);
     output_file = @sprintf("%s/all_radial_data.jld2", fft_directory)
-    N, ω, C0_data, Cp_data, Cn_data = read_frequency_file_to_radial_data(radii, grid.nkr, weight_matrix, fft_directory, output_file)
-    #N, ω, C0_data, Cp_data, Cn_data = read_from_radial_data_file(@sprintf("%s/all_radial_data.jld2", fft_directory))
+    # N, ω, C0_data, Cp_data, Cn_data = read_frequency_file_to_radial_data(radii, grid.nkr, weight_matrix, fft_directory, output_file)
+    N, ω, C0_data, Cp_data, Cn_data = read_from_radial_data_file(@sprintf("%s/all_radial_data.jld2", fft_directory))
     
-    fig1, fig2 = create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω)
+    fig1, fig2, fig3 = create_wavenumber_frequency_plot(N, sqrtgH, f0, C0_data, Cp_data, Cn_data, grid, radii, ω)
 
     save(@sprintf("images/KOmega_spectrum_run=%s.png", key_name), fig1)
     save(@sprintf("images/Omega_spectrum_run=%s.png", key_name), fig2)
+    save(@sprintf("images/total_wave_spectrum_run=%s.png", key_name), fig3)
 end
-
-start!()

@@ -9,7 +9,7 @@ module Parameters
     f = 3.0 * Cg
 
     nν = 4
-    νtune  = 1
+    νtune  = 4
 
     # Time stepper parameters
     cfltune = 0.04
@@ -18,9 +18,9 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 3100.
-    T = 3200.
-    output_dt = 0.03
+    spinup_T = 2000.
+    T = 2100.
+    output_dt = 0.005
     diag_dt = 0.01
 
     max_writes = 100

@@ -21,6 +21,14 @@ function idxcounts(idxtuple, Nbins)
     return bincounts
 end
 
+function get_grid_size(directory, file_key)
+    file = jldopen(@sprintf("%s/%s.%06d.jld2", directory, file_key, 0))
+    nx = file["grid/nx"]
+    Lx = file["grid/Lx"]
+    close(file)
+    return nx, Lx
+end
+
 function read_parameters(directory)
     file = jldopen(@sprintf("%s/packets.%06d.jld2", directory, 0))
     f0 = file["params/f0"]
@@ -28,6 +36,37 @@ function read_parameters(directory)
     freq_sign = file["params/ωsign"]
     close(file)
     return f0, Cg, freq_sign
+end
+
+function read_swqg_params(directory, key)
+    file = jldopen(@sprintf("%s/%s.%06d.jld2", directory, key, 0))
+    Kd2 = file["params/Kd2"]
+    close(file)
+    return (; Kd2)
+end
+
+function read_rsw_params(directory)
+    file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, 0))
+    f = file["params/f"]
+    Cg2 = file["params/Cg2"]
+    close(file)
+    return (; f, Cg2)
+end
+
+function read_dissipation(directory, key)
+    file = jldopen(@sprintf("%s/%s.%06d.jld2", directory, key, 0))
+    ν = file["params/ν"]
+    nν = file["params/nν"]
+    close(file)
+    return (; ν, nν)
+end
+
+function read_rsw_dissipation(directory)
+    file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, 0))
+    ν = file["params/ν"]
+    nν = file["params/nν"]
+    close(file)
+    return (; ν, nν)
 end
 
 function compute_strain_vorticity(ψh)
@@ -58,7 +97,7 @@ end
 
 function get_qgsw_times(directory)
     Nsnapshots = count_qgsw_snapshots(directory)
-    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
+    filename_func(idx) = @sprintf("%s/swqg.%06d.jld2", directory, idx)
     num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
     file_idx = 0
     snap_idx = 1
@@ -139,10 +178,9 @@ function load_first_last_frame(directory)
     return (t0, x0, k0, u0), (t1, x1, k1, u1)
 end
 
-function count_snapshots(directory)
+function count_snapshots(directory, num_files)
     num_snapshots = 0
     filename_func(idx) = @sprintf("%s/packets.%06d.jld2", directory, idx)
-    num_files = sum([1 for file in readdir(directory) if occursin("packets.", file)])-1
     file_idx = 1
     for j=0:num_files
         file = jldopen(filename_func(j))
@@ -150,6 +188,11 @@ function count_snapshots(directory)
         close(file)
     end
     return num_snapshots
+end
+
+function count_snapshots(directory)
+    num_files = sum([1 for file in readdir(directory) if occursin("packets.", file)])-1
+    count_snapshots(directory, num_files)
 end
 
 function count_key_snapshots(directory, key)
@@ -211,9 +254,31 @@ function compute_Cg_rms(k, f0, sqrtgH)
     return sqrt.(sum((sqrtgH^2 * k ./ ω).^2) / size(k, 1))
 end
 
+function load_key_snapshot(directory, key, idx)
+    filename_func(idx) = @sprintf("%s/%s.%06d.jld2", directory, key, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin(@sprintf("%s.", key), file)])-1
+    num_snapshots = 0
+    file = nothing
+    file_idx = idx
+    for j=0:num_files
+        file = jldopen(filename_func(j))
+        num_snapshots += length(keys(file["snapshots/t"]))
+        if idx <= num_snapshots
+            break
+        end
+        file_idx -= length(keys(file["snapshots/t"]))
+        close(file)
+    end
+
+    key = keys(file["snapshots/t"])[file_idx]
+    t = file["snapshots/t/" * key]
+    snapshot = file["snapshots/sol/" * key]
+    return t, snapshot
+end
+
 function load_qgsw_snapshot(directory, grid, snap_idx)
-    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
-    num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
+    filename_func(idx) = @sprintf("%s/swqg.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("swqg.", file)])-1
     num_snapshots = 0
     file = nothing
     file_idx = snap_idx
@@ -245,8 +310,8 @@ function load_qgsw_snapshot(directory, grid, snap_idx)
 end
 
 function load_qgswh_snapshot(directory, grid, snap_idx)
-    filename_func(idx) = @sprintf("%s/qgsw.%06d.jld2", directory, idx)
-    num_files = sum([1 for file in readdir(directory) if occursin("qgsw.", file)])-1
+    filename_func(idx) = @sprintf("%s/swqg.%06d.jld2", directory, idx)
+    num_files = sum([1 for file in readdir(directory) if occursin("swqg.", file)])-1
     num_snapshots = 0
     file = nothing
     file_idx = snap_idx
@@ -273,13 +338,14 @@ function load_qgswh_snapshot(directory, grid, snap_idx)
     return t, qh, ψh, uh, vh, Kd2
 end
 
-function load_2L_qg_params(directory)
+function read_2Lqg_params(directory)
     filename_func(idx) = @sprintf("%s/2Lqg.%06d.jld2", directory, idx)
     file = jldopen(filename_func(0))
     F = file["params/F"]
     U = file["params/U"]
+    μ = file["params/μ"]
     close(file)
-    return (; F, U)
+    return (; F, U, μ)
 end
 
 function load_2L_snapshot(directory, grid, params, snap_idx)

@@ -2,17 +2,19 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=12
-#SBATCH --mem=24GB
-#SBATCH --time=2-00:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16GB
+#SBATCH --time=23:59:59
 #SBATCH --job-name=rsw
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mail-user=nad9961@nyu.edu
+#SBATCH --mail-type=BEGIN
 
 module purge
 
 export NUM_JULIA_THREADS=`nproc`
 
-rundir=$SCRATCH/rsw/$SLURM_JOB_ID
+rundir=$VAST/rsw/$SLURM_JOB_ID
 mkdir -p $rundir
 cp rsw-driver.sbatch RotatingShallowWater.jl RSWDriver.jl RSWMain.jl README.txt $rundir
 cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir

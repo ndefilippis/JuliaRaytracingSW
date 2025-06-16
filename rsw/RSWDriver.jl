@@ -89,9 +89,10 @@ function start!()
     get_sol(prob) = Array(prob.sol)
     output = SequencedOutput(prob, filename_func, (:sol, get_sol), Parameters.max_writes)
 
-    rswE = Diagnostic(energy, prob; nsteps, freq=diags_freq)
-    diags = [rswE]
-    diag_names = ["energy"]
+    rsw_KE = Diagnostic(kinetic_energy, prob; nsteps, freq=diags_freq)
+    rsw_PE = Diagnostic(potential_energy, prob; nsteps, freq=diags_freq)
+    diags = [rsw_KE, rsw_PE]
+    diag_names = ["KE", "PE"]
 
     RotatingShallowWater.enforce_reality_condition!(prob)
     SequencedOutputs.saveproblem(output)

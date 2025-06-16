@@ -208,20 +208,26 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     Compute modified nonlinear pressure term
     ===#
 
+    ηh = vars.ζh
+    @. ηh = vars.ηh
+    ldiv!(vars.η, grid.rfftplan, ηh)
+    
     Fh = vars.ζh
     F  = vars.ζ
-    @. vars.ηh = vars.ηh
-    ldiv!(vars.η, grid.rfftplan, vars.ηh)
-    @. F = 0.5 / (1 + vars.η)^2
+    @. F = (1.5 - 0.5 / (1 + vars.η)^2)
     mul!(Fh, grid.rfftplan, F)
 
-    @. uhN += -params.Cg2 * grid.kr * Fh
-    @. vhN += -params.Cg2 * grid.l  * Fh
+    @. uhN += -1im * params.Cg2 * grid.kr * Fh
+    @. vhN += -1im * params.Cg2 * grid.l  * Fh
 
 
     #===
     Compute (ηu)_x and (ηv)_y terms
     ===#
+
+    ηh = vars.ζh
+    @. ηh = vars.ηh
+    ldiv!(vars.η, grid.rfftplan, ηh)
 
     ηux  = vars.ζ
     ηuxh = vars.ζh
@@ -339,6 +345,7 @@ end
 function potential_energy(ηh, params, grid)
   return params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
 end
+
 @inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)
 @inline potential_energy(sol, vars, params, grid) = potential_energy(vars.ηh, params, grid)
 
