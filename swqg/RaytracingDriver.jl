@@ -10,6 +10,23 @@ using .SWQG
 using .SequencedOutputs
 using .GPURaytracing;
 
+function load_from_snapshot(prob, snapshot_filename, snapshot_key)
+    grid = prob.grid
+    dev = typeof(grid.device)
+    T = typeof(grid.Lx)
+
+    @devzeros dev Complex{T} (grid.nkr, grid.nl) qh_snapshot
+
+    snapshot_file = jldopen(snapshot_filename, "r")
+    
+    qh_snapshot .= device_array(grid.device)(snapshot_file["snapshots/sol/" * snapshot_key])
+    
+    JLD2.close(snapshot_file)
+    
+    ψh = @. -qh_snapshot / (prob.grid.Krsq + prob.params.Kd2)
+    SWQG.set_solution!(prob, ψh)
+end
+
 function set_shafer_initial_condition_QG!(prob, Kg, ag)
     grid = prob.grid
     dev = typeof(grid.device)
@@ -57,7 +74,7 @@ function initialize_problem()
     Lx=Parameters.L
     nx=Parameters.nx
     dx=Lx/nx
-    kmax = nx/2 - 1
+    kmax = (nx/2 - 1) * Lx / (2π) * (1 - Parameters.aliased_fraction)
     nν=Parameters.nν
     νtune = Parameters.νtune
     
@@ -65,7 +82,7 @@ function initialize_problem()
     umax = Parameters.ag
     
     dt = cfltune / umax * dx
-    ν = νtune * 2π / nx / (kmax^(2*nν)) / dt
+    ν = νtune * Lx / nx / (kmax^(2*nν)) / dt
     
     nsteps = ceil(Int, Parameters.T / dt)
     spinup_step = floor(Int, Parameters.spinup_T / dt)
@@ -83,7 +100,11 @@ function initialize_problem()
     
     prob = SWQG.Problem(dev; Lx, nx, dt, Parameters.f, Cg=Parameters.background_Cg, T=Float32, nν, ν, aliased_fraction=1/3, use_filter=false)
     
-    set_shafer_initial_condition_QG!(prob, Parameters.Kg, Parameters.ag)
+    if(Parameters.use_snapshot_file)
+        load_from_snapshot(prob, Parameters.snapshot_file, Parameters.snapshot_key)
+    else
+        set_shafer_initial_condition_QG!(prob, Parameters.Kg, Parameters.ag)
+    end
 
     return prob, nsteps, spinup_step, output_per_packet_freq, packet_output_freq, diags_freq
 end
@@ -111,7 +132,7 @@ function write_packets!(out, clock, pos, wavenumber, velocity, gradient)
     return nothing;
 end
 
-function savepacketdata!(out, clock, 
+function savepacketdata!(out, clock,
     velocity, gradient, grid, 
     output_u, output_v, 
     output_ux, output_uy, output_vx, output_vy, 

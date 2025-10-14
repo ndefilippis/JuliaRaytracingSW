@@ -1,0 +1,3 @@
+ArrayTaskID snapshot_file snapshot_key
+1 /scratch/nad9961/swqg/66161250/1/swqg.000013.jld2 344680 
+2 /scratch/nad9961/swqg/66161250/1/swqg.000016.jld2 401480

@@ -3,10 +3,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=16GB
-#SBATCH --time=05:00:00
+#SBATCH --mem=64GB
+#SBATCH --time=1-8:59:00
 #SBATCH --job-name=rsw-plots
-#SBATCH --array=1-30
+#SBATCH --array=80-80
 #SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge

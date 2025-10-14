@@ -1,17 +1,14 @@
 include("IFMAB3.jl")
 include("SequencedOutputs.jl")
+
 include("GPURaytracing.jl")
-include("RaytracingDriver.jl")
+include("RotatingShallowWater.jl")
 
 include("RaytracingParameters.jl")
-include("RotatingShallowWater.jl")
 include("RSWRaytracingDriver.jl")
+include("RaytracingDriver.jl")
 
-using .RSWRaytracingDriver
 using .RaytracingDriver
 
-function start!()
-    start_raytracing!()
-end
+start_raytracing!()
 
-start!()

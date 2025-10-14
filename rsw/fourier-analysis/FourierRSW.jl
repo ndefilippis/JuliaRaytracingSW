@@ -121,7 +121,7 @@ function write_fourier_data(directory, file_indices, k_idx)
             vh = @views snapshot[:,:,2]
             ηh = @views snapshot[:,:,3]
             (ugh, vgh, ηgh), (uwh, vwh, ηwh) = wave_balanced_decomposition(uh, vh, ηh, grid, params)
-            c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋)
+            c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋, params)
 
             ut[base_index+frame_idx,:] .= @views  uh[k_idx, :]
             vt[base_index+frame_idx,:] .= @views  vh[k_idx, :]

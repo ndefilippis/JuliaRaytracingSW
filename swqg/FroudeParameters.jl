@@ -11,7 +11,7 @@ module Parameters
     f = 3.0 * Cg # Maintain a constant deformation radius
 
     nν = 4
-    νtune  = 1
+    νtune  = 10.0
 
     # Time stepper parameters
     cfltune = 0.1
@@ -22,15 +22,18 @@ module Parameters
     # Output and timing parameters
 
     T = parse(Float32, ARGS[4])
-    spinup_T = T/10.0
+    spinup_T = T/5.0
 
-    output_dt = 10.0/f
+    output_dt = 1.0
     diag_dt = 0.5/f
 
     max_writes = 500
     base_filename = "swqg"
 
     # Initial condition parameters
+    use_snapshot_file = false
+    snapshot_file = ""
+    snapshot_key = ""
     Kg = (10, 13)
     ag = parse(Float32, ARGS[1])
 
@@ -38,7 +41,7 @@ module Parameters
     packet_base_filename = "packets"
     use_stationary_background_flow = false
     write_gradients = true
-    packet_max_writes = 3000
+    packet_max_writes = 300
     packet_output_dt = 1.0;
 
     # Wavepackets parameters

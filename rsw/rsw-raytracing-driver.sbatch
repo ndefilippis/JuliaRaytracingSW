@@ -2,11 +2,13 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=15GB
-#SBATCH --time=23:59:59
-#SBATCH --gres=gpu:rtx8000:1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=16GB
+#SBATCH --time=1-01:59:59
+#SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=rsw_ray
+#SBATCH --mail-user=nad9961@nyu.edu
+#SBATCH --mail-type=BEGIN,FAIL,COMPLETED
 #SBATCH --output=./slurm-output/slurm-%A.out
 
 module purge

@@ -6,12 +6,11 @@ using Random: seed!;
 using JLD2;
 using LinearAlgebra: ldiv!
 
-import .Parameters;
-using .RotatingShallowWater
-using .GPURaytracing
-using .RaytracingDriver
+import ..Parameters;
+using ..RotatingShallowWater
+using ..GPURaytracing
 
-export create_raytracing_model, set_seed_initial_condition!, get_streamfunction!, estimate_max_U, create_fourier_flows_problem
+export create_raytracing_model, set_initial_condition!, get_streamfunction!, estimate_max_U, create_fourier_flows_problem
 
 function set_initial_condition!(prob, grid, dev)
     dev = typeof(grid.device)
@@ -29,7 +28,7 @@ function set_initial_condition!(prob, grid, dev)
     @devzeros dev T (grid.nx, grid.ny) ug uw
     
     geo_filter  = Kg[1]^2 .<= grid.Krsq .<= Kg[2]^2
-    wave_filter = Kw[1]^2 .<= grid.Krsq .<= Kw[2]^2
+    wave_filter = (Kw[1]^2 .<= grid.Krsq .<= Kw[2]^2) .& (grid.Krsq .> 0)
     phase = device_array(grid.device)(2π*rand(grid.nkr, grid.nl))
     sgn =  device_array(grid.device)(sign.(rand(grid.nkr, grid.nl) .- 0.5))
     shift = exp.(1im * phase)
@@ -58,7 +57,7 @@ function get_streamfunction!(ψh, prob)
     uh = @views prob.sol[:,:,1]
     vh = @views prob.sol[:,:,2]
     ηh = @views prob.sol[:,:,3]
-    return get_streamfunction(ψh, uh, vh, ηh, prob.params, prob.grid)
+    return get_streamfunction!(ψh, uh, vh, ηh, prob.params, prob.grid)
 end
 
 function get_streamfunction!(ψh, uh, vh, ηh, params, grid)

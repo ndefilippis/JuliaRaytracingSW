@@ -4,8 +4,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=24GB
-#SBATCH --time=06:00:00
-#SBATCH --gres=gpu:rtx8000:1
+#SBATCH --time=12:00:00
+#SBATCH --gres=gpu:v100:1
 #SBATCH --job-name=ray_qgsw
 
 module purge

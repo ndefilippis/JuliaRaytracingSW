@@ -1,0 +1,1 @@
+head -n60 rsw-runs.txt | tail -n7 | awk '{print run.log}' | while read dir; do echo ; head -n3  | tail -n1; done

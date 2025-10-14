@@ -1,1 +1,1 @@
-Long two layer run with large dissipation to test spectral energy lux code
+Running with differing background flows but scaling time with 1/Fr^2

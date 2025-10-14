@@ -1,6 +1,6 @@
 using JLD2
 using FourierFlows
-using FourierFlows: parsevalsum2
+using FourierFlows: parsevalsum2, parsevalsum
 using Printf
 using CairoMakie
 using AbstractFFTs
@@ -22,7 +22,8 @@ function compute_energy_data(run_directory, grid)
     APEh  = zeros(grid.nkr, grid.nl)
     APEgh = zeros(grid.nkr, grid.nl)
     APEwh = zeros(grid.nkr, grid.nl)
-    Zh  = zeros(grid.nkr, grid.nl)
+    Zh    = zeros(grid.nkr, grid.nl)
+    ζ2h = zeros(grid.nkr, grid.nl)
 
     snap_frames = 2:Nsnapshots
     N_frames = length(snap_frames)
@@ -36,6 +37,12 @@ function compute_energy_data(run_directory, grid)
     APEg_total = zeros(N_frames)
     APEw_total = zeros(N_frames)
     Z_total   = zeros(N_frames)
+    ζ2_total = zeros(N_frames)
+
+    Umax_series  = zeros(N_frames)
+    Ugmax_series = zeros(N_frames)
+    Uwmax_series = zeros(N_frames)
+    ζmax_series  = zeros(N_frames)
     
     array_idx = 1
     
@@ -49,30 +56,39 @@ function compute_energy_data(run_directory, grid)
         times[array_idx] = t
         
         dealias!(rsw_sol, grid)
-        ((KE, PE, KEg, PEg, KEw, PEw, Eg, Ew, Z), (KE_sum, PE_sum, KEg_sum, PEg_sum, KEw_sum, PEw_sum, Z_sum)) = compute_energy(rsw_sol, bases, grid, params)
+        ((KE, PE, KEg, PEg, KEw, PEw, Eg, Ew, Z, ζ2), (KE_sum, PE_sum, KEg_sum, PEg_sum, KEw_sum, PEw_sum, Z_sum, rms_ζ2_sum), (Umax, Ugmax, Uwmax, ζmax)) = compute_energy(rsw_sol, bases, grid, params)
 
-        @. Egh   += Eg
-        @. Ewh   += Ew
-        @. KEh   += KE
-        @. KEgh  += KEg
-        @. KEwh  += KEw
-        @. APEh  += PE
-        @. APEgh += PEg
-        @. APEwh += PEw
-        @. Zh    += Z
+        @. Egh    += Eg/N_frames
+        @. Ewh    += Ew/N_frames
+        @. KEh    += KE/N_frames
+        @. KEgh   += KEg/N_frames
+        @. KEwh   += KEw/N_frames
+        @. APEh   += PE/N_frames
+        @. APEgh  += PEg/N_frames
+        @. APEwh  += PEw/N_frames
+        @. Zh     += Z/N_frames
+        @. ζ2h    += ζ2/N_frames
 
-        KE_total[array_idx]   = KE_sum
-        KEg_total[array_idx]  = KEg_sum
-        KEw_total[array_idx]  = KEw_sum
-        APE_total[array_idx]  = PE_sum
-        APEg_total[array_idx] = PEg_sum
-        APEw_total[array_idx] = PEw_sum
-        Z_total[array_idx]    = Z_sum
+        KE_total[array_idx]    = KE_sum
+        KEg_total[array_idx]   = KEg_sum
+        KEw_total[array_idx]   = KEw_sum
+        APE_total[array_idx]   = PE_sum
+        APEg_total[array_idx]  = PEg_sum
+        APEw_total[array_idx]  = PEw_sum
+        Z_total[array_idx]     = Z_sum
+        ζ2_total[array_idx] = rms_ζ2_sum
+
+        Umax_series[array_idx]  = Umax
+        Ugmax_series[array_idx] = Ugmax
+        Uwmax_series[array_idx] = Uwmax
+        ζmax_series[array_idx]  = ζmax
         
         array_idx += 1
     end
     
-    return times, Egh, Ewh, KEh, KEgh, KEwh, APEh, APEgh, APEwh, Zh, KE_total, KEg_total, KEw_total, APE_total, APEg_total, APEw_total, Z_total  
+    return times, Egh, Ewh, KEh, KEgh, KEwh, APEh, APEgh, APEwh, Zh, ζ2h,
+            KE_total, KEg_total, KEw_total, APE_total, APEg_total, APEw_total, Z_total, ζ2_total,
+            Umax_series, Ugmax_series, Uwmax_series, ζmax_series
 end
 
 function compute_energy(snapshot, bases, grid, params)
@@ -82,17 +98,50 @@ function compute_energy(snapshot, bases, grid, params)
     
     c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, bases..., params)
     ((ugh, vgh, ηgh), (uwh, vwh, ηwh)) = wave_balanced_decomposition(uh, vh, ηh, grid, params)
-    qh = @. 1im * grid.kr * vh - 1im * grid.l * uh - params.f * ηh
+    ζh = @. 1im * grid.kr * vh - 1im * grid.l * uh
+    qh = @. ζh - params.f * ηh
 
     ((KE,  KE_total),  (PE,  PE_total))  = compute_energetics(uh, vh, ηh, grid, params)
     ((KEg, KEg_total), (PEg, PEg_total)) = compute_energetics(ugh, vgh, ηgh, grid, params)
-    Z, Z_total                           = compute_enstrophy(qh, grid, params)
     ((KEw, KEw_total), (PEw, PEw_total)) = compute_energetics(uwh, vwh, ηwh, grid, params)
+    Z, Z_total                           = compute_enstrophy(qh, grid, params) 
+    ζ2, ζ2_total                         = compute_enstrophy(ζh, grid, params)
 
     Eg = abs2.(c₀) * grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
     Ew = (abs2.(c₊) + abs2.(c₋)) * grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
 
-    return ((KE, PE, KEg, PEg, KEw, PEw, Eg, Ew, Z), (KE_total, PE_total, KEg_total, PEg_total, KEw_total, PEw_total, Z_total))
+    Umax  = sqrt(maximum(compute_speed_squared(uh,  vh,  grid)))
+    Ugmax = sqrt(maximum(compute_speed_squared(ugh, vgh, grid)))
+    Uwmax = sqrt(maximum(compute_speed_squared(uwh, vwh, grid)))
+
+    ζ = irfft(ζh, grid.nx)
+    ζmax = sqrt(maximum(abs.(ζ)))
+
+    return ((KE, PE, KEg, PEg, KEw, PEw, Eg, Ew, Z, ζ2), 
+            (KE_total, PE_total, KEg_total, PEg_total, KEw_total, PEw_total, Z_total, ζ2_total),
+            (Umax, Ugmax, Uwmax, ζmax))
+end
+
+function compute_cubic_energetics(uh, vh, ηh, grid, params)
+    u = irfft(uh, grid.nx)
+    v = irfft(vh, grid.nx)
+    η = irfft(ηh, grid.nx)
+    one_plus_η = max.(0, 1 + η)
+    sqrt_one_plus_η = @. sqrt(one_plus_η)
+    m1 = sqrt_one_plus_η .* u
+    m2 = sqrt_one_plus_η .* v
+    m3 = one_plus_η
+    
+    m1h = rfft(m1)
+    m2h = rfft(m2)
+    m3h = rfft(m3)
+    
+    KE = 0.5 * (abs2.(m1h) + abs2.(m2h)) * grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
+    PE = 0.5 * params.Cg2 * abs2.(m3h)  * grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
+
+    KE_total = 0.5 * (parsevalsum2(m1h, grid) + parsevalsum2(m2h, grid)) / grid.Lx / grid.Ly
+    PE_total = 0.5 * params.Cg2 * parsevalsum2(m3h, grid) / grid.Lx / grid.Ly
+    return ((KE, KE_total), (PE, PE_total))
 end
 
 function compute_energetics(uh, vh, ηh, grid, params)
@@ -104,9 +153,16 @@ function compute_energetics(uh, vh, ηh, grid, params)
     return ((KE, KE_total), (PE, PE_total))
 end
 
+function compute_speed_squared(uh, vh, grid)
+    u = irfft(uh, grid.nx)
+    v = irfft(vh, grid.nx)
+    U2 = @. u^2 + v^2
+    return U2
+end
+
 function compute_enstrophy(qh, grid, params)
     Z = abs2.(qh)  * grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
-    Z_total = parsevalsum2(Z, grid) / grid.Lx / grid.Ly
+    Z_total = parsevalsum2(qh, grid) / grid.Lx / grid.Ly
 
     return Z, Z_total
 end

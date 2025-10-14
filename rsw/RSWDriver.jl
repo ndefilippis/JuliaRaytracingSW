@@ -3,8 +3,37 @@ using .SequencedOutputs
 using FourierFlows
 using Printf
 using LinearAlgebra: mul!, ldiv!
+using JLD2
 
 import .Parameters
+
+function load_initial_condition_from_file!(prob, snapshot_filename, snapshot_key)
+    snapshot_file = jldopen(snapshot_filename, "r")
+    load_from_snapshot!(prob, snapshot_file[snapshot_key])
+    JLD2.close(snapshot_file)
+end
+
+function load_from_snapshot!(prob, initial_snapshot)
+    grid = prob.grid
+    dev = typeof(grid.device)
+    T = typeof(grid.Lx)
+
+    A = typeof(prob.vars.uh)
+    
+    device_snapshot = device_array(grid.device)(initial_snapshot)
+    
+    snapshot_nkr = size(device_snapshot, 1)
+    snapshot_nl  = size(device_snapshot, 2)
+    half_nl = snapshot_nkr - 1
+    scale_factor = grid.nl^2 / snapshot_nl^2
+    
+    @devzeros dev Complex{T} (grid.nkr, grid.nl, 3) new_snapshot
+    
+    @views new_snapshot[1:snapshot_nkr, 1:half_nl, :]           .= scale_factor * device_snapshot[:, 1:half_nl, :]
+    @views new_snapshot[1:snapshot_nkr, (end-half_nl+1):end, :] .= scale_factor * device_snapshot[:, (half_nl+1):end, :]
+
+    RotatingShallowWater.set_solution!(prob, new_snapshot[:,:,1], new_snapshot[:,:,2], new_snapshot[:,:,3])
+end
 
 function set_shafer_initial_condition!(prob, Kg, Kw, ag, aw, f, Cg2)
     grid = prob.grid
@@ -12,31 +41,43 @@ function set_shafer_initial_condition!(prob, Kg, Kw, ag, aw, f, Cg2)
     T = typeof(grid.Lx)
 
     @devzeros dev Complex{T} (grid.nkr, grid.nl) ugh vgh ηgh uwh vwh ηwh
-    @devzeros dev T (grid.nx, grid.ny) ug uw
+    @devzeros dev T (grid.nx, grid.ny) ug uw vg vw ζ
     
-    geo_filter  = Kg[1]^2 .<= grid.Krsq .<= Kg[2]^2
-    wave_filter = Kw[1]^2 .<= grid.Krsq .<= Kw[2]^2
+    geo_filter  = (Kg[1]^2 .<= grid.Krsq .<= Kg[2]^2) .& (grid.Krsq .> 0)
+    wave_filter = (Kw[1]^2 .<= grid.Krsq .<= Kw[2]^2) .& (grid.Krsq .> 0)
     phase = device_array(grid.device)(2π*rand(grid.nkr, grid.nl))
     sgn =  device_array(grid.device)(sign.(rand(grid.nkr, grid.nl) .- 0.5))
     shift = exp.(1im * phase)
-    ηgh[geo_filter] += ( 0.5   * shift)[geo_filter]
-    ugh[geo_filter] += (-0.5im * Cg2 / f * grid.l  .* shift)[geo_filter]
-    vgh[geo_filter] += ( 0.5im * Cg2 / f * grid.kr .* shift)[geo_filter]
+    ω = sqrt.(f^2 .+ Cg2 * grid.Krsq)
+    geo_amp_factor  = 1 ./ ω# .* (grid.invKrsq).^(3/4) # Uncomment for constant radial vorticity scaling
+    wave_amp_factor = sqrt.(grid.invKrsq) ./ (2 * ω)# .* (grid.invKrsq).^(1/4) # Uncomment for constant radial energy scaling
+    ηgh[geo_filter] += ( geo_amp_factor  * f .* shift)[geo_filter]
+    ugh[geo_filter] += (-geo_amp_factor  * 1im * Cg2 .* grid.l  .* shift)[geo_filter]
+    vgh[geo_filter] += ( geo_amp_factor  * 1im * Cg2 .* grid.kr .* shift)[geo_filter]
 
     ldiv!(ug, grid.rfftplan, deepcopy(ugh))
-    ηgh *= ag / maximum(abs.(ug))
-    ugh *= ag / maximum(abs.(ug))
-    vgh *= ag / maximum(abs.(ug))
+    ldiv!(vg, grid.rfftplan, deepcopy(vgh))
+    ζh = 1im * grid.kr .* vgh - 1im * grid.l .* ugh
+    ldiv!(ζ, grid.rfftplan, deepcopy(ζh))
 
-    ωK =  sgn .* sqrt.(f^2 .+ Cg2 * grid.Krsq)
-    ηwh[wave_filter] += (0.5 * shift)[wave_filter]
-    uwh[wave_filter] += (grid.invKrsq.*(0.5 * grid.kr .* ωK .* shift + 0.5im * f * grid.l  .* shift))[wave_filter]
-    vwh[wave_filter] += (grid.invKrsq.*(0.5 * grid.l .*  ωK .* shift - 0.5im * f * grid.kr .* shift))[wave_filter]
+    Umax = maximum(sqrt.(ug.^2 + vg.^2))
+    ηgh .*= ag / Umax
+    ugh .*= ag / Umax
+    vgh .*= ag / Umax
+
+    ηwh[wave_filter] += (wave_amp_factor .* grid.Krsq .* shift)[wave_filter]
+    uwh[wave_filter] += (wave_amp_factor .* (sgn .* grid.kr .* ω .* shift + 1im * f * grid.l  .* shift))[wave_filter]
+    vwh[wave_filter] += (wave_amp_factor .* (sgn .* grid.l  .* ω .* shift - 1im * f * grid.kr .* shift))[wave_filter]
     
     ldiv!(uw, grid.rfftplan, deepcopy(uwh))
-    ηwh *= aw / maximum(abs.(uw))
-    uwh *= aw / maximum(abs.(uw))
-    vwh *= aw / maximum(abs.(uw))
+    ldiv!(vw, grid.rfftplan, deepcopy(vwh))
+    ζh = 1im * grid.kr .* vwh - 1im * grid.l .* uwh
+    ldiv!(ζ, grid.rfftplan, deepcopy(ζh))
+    Umax = maximum(sqrt.(uw.^2 + vw.^2))
+    
+    ηwh .*= aw / Umax
+    uwh .*= aw / Umax
+    vwh .*= aw / Umax
     RotatingShallowWater.set_solution!(prob, ugh + uwh, vgh + vwh, ηgh + ηwh)
 end
 
@@ -45,13 +86,17 @@ function initialize_problem()
     Lx=Parameters.L
     nx=Parameters.nx
     dx=Lx/nx
-    kmax = (nx/2 - 1) * Lx / (2π)
+    kmax = (nx/2 - 1) * Lx / (2π) * (1 - Parameters.aliased_fraction)
     nν=Parameters.nν
 
     umax = Parameters.ag + Parameters.aw
     νtune = Parameters.νtune
     dt = Parameters.cfltune / umax * dx
-    ν = Parameters.νtune * dx / (kmax^(2*nν)) / dt
+
+    # ϵ = 3.3561e-19 # Fixed energy dissipation rate from baseline run
+    # ν = Parameters.νtune * (ϵ/(kmax^(6*nν-2)))^(1/3) # Fixed energy dissipation scaling
+    ν = Parameters.νtune * dx / (kmax^(2*nν)) / dt # Fixed enstrophy dissipation scaling
+
     nsteps = ceil(Int, Parameters.T / dt)
     spinup_step = floor(Int, Parameters.spinup_T / dt)
     output_freq = max(floor(Int, Parameters.output_dt / dt), 1)
@@ -68,8 +113,12 @@ function initialize_problem()
     
     prob = RotatingShallowWater.Problem(dev; Lx, nx, dt, f=Parameters.f, Cg=Parameters.Cg, T=Float32, nν, ν, aliased_fraction=Parameters.aliased_fraction, order=Parameters.filter_order, use_filter=Parameters.use_filter)
     grid, clock, vars, params = prob.grid, prob.clock, prob.vars, prob.params
-    
-    set_shafer_initial_condition!(prob, Parameters.Kg, Parameters.Kw, Parameters.ag, Parameters.aw, params.f, params.Cg2)
+
+    if Parameters.random_initial_condition
+        set_shafer_initial_condition!(prob, Parameters.Kg, Parameters.Kw, Parameters.ag, Parameters.aw, params.f, params.Cg2)
+    else
+        load_initial_condition_from_file!(prob, Parameters.snapshot_file, Parameters.snapshot_key)
+    end
 
     return prob, nsteps, spinup_step, output_freq, diags_freq
 end

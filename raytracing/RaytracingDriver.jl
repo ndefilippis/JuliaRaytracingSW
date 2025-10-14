@@ -6,11 +6,23 @@ using Random: seed!;
 using JLD2;
 using LinearAlgebra: ldiv!;
 
-import .Parameters;
-using .GPURaytracing;
-using .SequencedOutputs;
+import ..Parameters;
+using ..GPURaytracing;
+using ..SequencedOutputs;
+using ..RSWRaytracingDriver;
+using ..RotatingShallowWater
 
-export start_raytracing!
+export start_raytracing!, initialize_problem, get_velocity_info, savepacketproblem!, savepacketdata!, savediagnostics
+
+function generate_single_wavepacket(dev, L, x0, k0)
+    @devzeros typeof(dev) Float64 (1, 4) wavepackets_array
+    @views wavepackets_array[1,1:2] = x0
+    @views wavepackets_array[1,3:4] = k0
+    
+    @devzeros typeof(dev) Float64 (1, 1) frequency_sign
+    frequency_sign .= 1
+    return wavepackets_array, frequency_sign;
+end
 
 function generate_initial_wavepackets(dev, L, k0, Npackets, sqrtNpackets)
     @devzeros typeof(dev) Float64 (Npackets, 4) wavepackets_array
@@ -34,7 +46,7 @@ function generate_initial_wavepackets(dev, L, k0, Npackets, sqrtNpackets)
     return wavepackets_array, frequency_sign;
 end
 
-function initialize_problem()
+function initialize_problem(Npackets, umax)
     dev = GPU()
 
     Lx=Parameters.L
@@ -46,7 +58,6 @@ function initialize_problem()
     cfltune = Parameters.cfltune
     order=Parameters.filter_order
     use_filter=Parameters.use_filter
-    umax = estimate_max_U()
     
     dt = cfltune / umax * dx
     ν = νtune * 2π / nx / (kmax^(2*nν)) / dt
@@ -55,6 +66,7 @@ function initialize_problem()
     prob = create_fourier_flows_problem(dev, common_params)
     
     spinup_step = floor(Int, Parameters.spinup_T / dt)
+    packet_spinup_step = floor(Int, Parameters.packet_spinup_T / dt)
     packet_output_freq = max(floor(Int, Parameters.packet_output_dt / dt), 1)
     output_per_packet_freq = max(floor(Int, Parameters.output_dt / Parameters.packet_output_dt), 1)
     output_freq = output_per_packet_freq * packet_output_freq
@@ -65,11 +77,11 @@ function initialize_problem()
     
     println(@sprintf("Total time: %f, Time step: %f, Estimated CFL: %0.3f", Parameters.T, dt, Parameters.cfltune))
 
-    println(@sprintf("Packets: %d. Output every %d steps. Total %d packet frames", Parameters.Npackets, packet_output_freq, (nsteps - spinup_step) / packet_output_freq))
+    println(@sprintf("Packets: %d. Output every %d steps. Total %d packet frames", Npackets, packet_output_freq, (nsteps - spinup_step) / packet_output_freq))
 
     set_initial_condition!(prob, prob.grid, dev)
 
-    return prob, nsteps, spinup_step, output_per_packet_freq, packet_output_freq, diags_freq
+    return prob, nsteps, spinup_step, packet_spinup_step, output_per_packet_freq, packet_output_freq, diags_freq
 end
 
 function savepacketproblem!(out, params)
@@ -118,7 +130,6 @@ function savediagnostics(diagnostics, diagnostic_names)
 end
 
 function get_velocity_info(ψh, prob, params, v_info, grad_v_info, temp_in_field, temp_out_field)
-    get_streamfunction!(ψh, prob)
     grid = prob.grid
     k = grid.kr;
     l = grid.l;
@@ -145,9 +156,9 @@ end
 function start_raytracing!()
     seed!(1234)
 
-    prob, nsteps, spinup_step, output_per_packet_freq, packet_output_freq, diags_freq = initialize_problem()
+    prob, nsteps, spinup_step, packet_spinup_step, output_per_packet_freq, packet_output_freq, diags_freq = initialize_problem()
 
-    enforce_reality_condition!(prob)
+    RotatingShallowWater.enforce_reality_condition!(prob)
     
     grid, clock, vars, params = prob.grid, prob.clock, prob.vars, prob.params
     device = grid.device
@@ -237,7 +248,7 @@ function start_raytracing!()
         end        
 
 		old_t = clock.t
-        if (clock.step < spinup_step)
+        if (clock.step < packet_spinup_step)
             stepforward!(prob, diags, packet_output_freq * output_per_packet_freq)
             updatevars!(prob)
             get_velocity_info(streamfunction, prob, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
@@ -265,10 +276,10 @@ function start_raytracing!()
                 output_u, output_v, output_ux, output_uy, output_vx, output_vy,
                 packet_pos, packet_K, packet_U, packet_grad_U, Parameters.write_gradients)
         end
-        if (step % output_per_packet_freq == 0)
+        if ((clock.step >= spinup_step) & (step % output_per_packet_freq == 0))
             SequencedOutputs.saveoutput(output)
         end
-        if(any(isnan.(prob.vars.qh)))
+        if(any(isnan.(prob.vars.uh)))
             println("q is nan. Exiting...")
             SequencedOutputs.close(output)
             SequencedOutputs.close(packet_output)

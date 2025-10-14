@@ -28,7 +28,8 @@ function compute_transfer_function(run_directory, grid)
     Zwwwh_flux = zeros(grid.nkr, grid.nl)
 
     snap_frames = 2:Nsnapshots
-    
+
+    N_frames = length(snap_frames)
     times = zeros(length(snap_frames))
     array_idx = 1
     
@@ -74,17 +75,17 @@ function compute_transfer_function(run_directory, grid)
         
         Ewww, Zwww = compute_flux_fields(uwh, vwh, ηwh, qwh, ww_quadratic_terms, grid, params)
 
-        @. Eh_flux    += E
-        @. Egggh_flux += Eggg
-        @. Eggwh_flux += Eggw + Ewgg
-        @. Egwwh_flux += Egww + Ewwg
-        @. Ewwwh_flux += Ewww
+        @. Eh_flux    += E/N_frames
+        @. Egggh_flux += Eggg/N_frames
+        @. Eggwh_flux += (Eggw + Ewgg)/N_frames
+        @. Egwwh_flux += (Egww + Ewwg)/N_frames
+        @. Ewwwh_flux += Ewww/N_frames
 
-        @. Zh_flux    += Z
-        @. Zgggh_flux += Zggg
-        @. Zggwh_flux += Zggw + Zwgg
-        @. Zgwwh_flux += Zgww + Zwwg
-        @. Zwwwh_flux += Zwww
+        @. Zh_flux    += Z/N_frames
+        @. Zgggh_flux += Zggg/N_frames
+        @. Zggwh_flux += (Zggw + Zwgg)/N_frames
+        @. Zgwwh_flux += (Zgww + Zwwg)/N_frames
+        @. Zwwwh_flux += Zwww/N_frames
 
         array_idx += 1
     end

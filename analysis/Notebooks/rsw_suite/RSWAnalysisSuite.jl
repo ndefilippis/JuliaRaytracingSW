@@ -21,7 +21,7 @@ function start!(run_directory, tag; force_recompute=false)
 
     data_file = jldopen(@sprintf("%s/plot_data.jld2", run_directory), "r")
     
-    fig_opts = (; fontsize=24, fonts = (; regular = "Dejavu"))
+    fig_opts = (; fonts = (; regular = "Dejavu"))
         
     plot_data(run_directory, data_file, grid, tag, fig_opts)
 
@@ -31,13 +31,14 @@ end
 function create_data_if_empty(run_directory, data_file, grid; force_recompute)
     create_flux_data(run_directory, data_file, grid; force_recompute)
     create_energy_data(run_directory, data_file, grid; force_recompute)
-    create_computed_data(run_directory, data_file, grid; force_recompute=false)
+    create_computed_data(run_directory, data_file, grid; force_recompute)
 end
 
 function plot_data(run_directory, data_file, grid, tag, fig_opts)
-    plot_diagnostic_energetics(run_directory, data_file, grid, tag, (; size=(1000, 600), fig_opts))
-    plot_radial_energetics(run_directory, data_file, grid, tag, (; size=(600, 500), fig_opts))
-    plot_spectral_fluxes(run_directory, data_file, grid, tag, (; size=(600, 500), fig_opts))
+    plot_diagnostic_energetics(run_directory, data_file, grid, tag, (; size=(1000, 600), fontsize=30, fig_opts...))
+    plot_radial_energetics(run_directory, data_file, grid, tag, (; size=(600, 500), fontsize=22, fig_opts...))
+    plot_spectral_fluxes(run_directory, data_file, grid, tag, (; size=(600, 500), fontsize=22, fig_opts...))
+    plot_snapshots(run_directory, data_file, grid, tag, (; size=(600, 500), fontsize=22, fig_opts...))
 end
 
 function create_flux_data(run_directory, data_file, grid; force_recompute=false)
@@ -62,8 +63,33 @@ end
 
 function create_energy_data(run_directory, data_file, grid; force_recompute=false)
     if !haskey(data_file, "energy") || force_recompute
+           
+        # Initial data
+        f, Cg2 = read_rsw_params(run_directory)
+        params = (; f, Cg2)
+        bases = compute_balanced_wave_bases(grid, params)
+        _, rsw_sol = load_key_snapshot(run_directory, "rsw", 1)
+        ((KE, PE, KEg, PEg, KEw, PEw, Eg, Ew, Z, ζ2), 
+            (KE_total, PE_total, KEg_total, PEg_total, KEw_total, PEw_total, Z_total, ζ2_total),
+            (Umax, Ugmax, Uwmax, ζmax)) = compute_energy(rsw_sol, bases, grid, params)
+
+        data_file["initial_condition/KE/total"] = KE_total
+        data_file["initial_condition/APE/total"] = PE_total
+        data_file["initial_condition/KE/geo"] = KEg_total
+        data_file["initial_condition/APE/geo"] = PEg_total
+        data_file["initial_condition/KE/wave"] = KEw_total
+        data_file["initial_condition/APE/wave"] = PEw_total
+        data_file["initial_condition/rms_ζ/total"] = sqrt(ζ2_total)
+        
+        data_file["initial_condition/max/total_U"] = Umax
+        data_file["initial_condition/max/geo_U"] = Ugmax
+        data_file["initial_condition/max/wave_U"] = Uwmax
+        data_file["initial_condition/max/ζ"] = ζmax
+        
         energy_data = compute_energy_data(run_directory, grid)
-        times, Egh, Ewh, KEh, KEgh, KEwh, APEh, APEgh, APEwh, Zh, KE_total, KEg_total, KEw_total, APE_total, APEg_total, APEw_total, Z_total = energy_data
+        times, Egh, Ewh, KEh, KEgh, KEwh, APEh, APEgh, APEwh, Zh, ζ2h,
+        KE_total, KEg_total, KEw_total, APE_total, APEg_total, APEw_total, Z_total, ζ2_total,
+        Umax_series, Ugmax_series, Uwmax_series, ζmax_series = energy_data
 
         data_file["energy/t"] = times
 
@@ -76,6 +102,7 @@ function create_energy_data(run_directory, data_file, grid; force_recompute=fals
         data_file["energy/APE/geo"] = APEgh
         data_file["energy/APE/wave"] = APEwh
         data_file["energy/Z"] = Zh
+        data_file["energy/ζ2"] = ζ2h
 
         data_file["energy/series/KE/total"] = KE_total
         data_file["energy/series/KE/geo"] = KEg_total
@@ -84,21 +111,31 @@ function create_energy_data(run_directory, data_file, grid; force_recompute=fals
         data_file["energy/series/APE/geo"] = APEg_total
         data_file["energy/series/APE/wave"] = APEw_total
         data_file["energy/series/Z"] = Z_total
+        data_file["energy/series/rms_ζ"] = sqrt.(ζ2_total)
+
+        data_file["energy/series/max/total_U"] = Umax_series
+        data_file["energy/series/max/geo_U"] = Ugmax_series
+        data_file["energy/series/max/wave_U"] = Uwmax_series
+        data_file["energy/series/max/ζ"] = ζmax_series
     end
 end
 
 function create_computed_data(run_directory, data_file, grid; force_recompute=false)
     if !haskey(data_file, "computed") || force_recompute
 
+        if(force_recompute)
+            delete!(data_file, "computed")
+        end
+
         f, Cg2 = read_rsw_params(run_directory)
         Kd2 = f^2/Cg2
 
-        data_file["computed/eddy_scale/total"] = @. sqrt(Kd2 * data_file["energy/KE/total"] / data_file["energy/PE/total"])
-        data_file["computed/eddy_scale/geo"]   = @. sqrt(Kd2 * data_file["energy/KE/geo"] / data_file["energy/PE/geo"])
+        data_file["computed/eddy_scale/total"] = @. sqrt(Kd2 * data_file["energy/series/KE/total"] / data_file["energy/series/APE/total"])
+        data_file["computed/eddy_scale/geo"]   = @. sqrt(Kd2 * data_file["energy/series/KE/geo"] / data_file["energy/series/APE/geo"])
         
-        data_file["computed/rms_u/total"] = @. sqrt(2 * data_file["energy/KE/total"])
-        data_file["computed/rms_u/geo"]   = @. sqrt(2 * data_file["energy/KE/geo"])
-        data_file["computed/rms_u/wave"]  = @. sqrt(2 * data_file["energy/KE/wave"])
+        data_file["computed/rms_u/total"] = @. sqrt(2 * data_file["energy/series/KE/total"])
+        data_file["computed/rms_u/geo"]   = @. sqrt(2 * data_file["energy/series/KE/geo"])
+        data_file["computed/rms_u/wave"]  = @. sqrt(2 * data_file["energy/series/KE/wave"])
 
         data_file["computed/Fr/total"] = @. data_file["computed/rms_u/total"] / sqrt(Cg2)
         data_file["computed/Fr/geo"]   = @. data_file["computed/rms_u/geo"] / sqrt(Cg2)
@@ -145,7 +182,7 @@ function plot_spectral_fluxes(run_directory, data_file, grid, tag, fig_opts)
     # b. Plot component-wise spectral fluxes
     
     Nsnapshots = length(data_file["energy/t"])
-    norm_factor = grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2) / Nsnapshots
+    norm_factor = grid.Lx * grid.Ly / (grid.nx^2 * grid.ny^2)
     f, Cg2 = read_rsw_params(run_directory)
     Kd = f/sqrt(Cg2)
 
@@ -171,11 +208,15 @@ function plot_spectral_fluxes(run_directory, data_file, grid, tag, fig_opts)
     plot_radial_data_integral(comp_flux_ax, radii/Kd, weight_matrix, norm_factor * data_file["flux/energy_flux_gww"], label="Πgww(k)", color=:azure4)
     plot_radial_data_integral(comp_flux_ax, radii/Kd, weight_matrix, norm_factor * data_file["flux/energy_flux_www"], label="Πwww(k)", color=:steelblue)
 
-    Legend(total_flux_fig[2,1], total_flux_ax, orientation=:horizontal)
-    Legend(comp_flux_fig[2,1], comp_flux_ax, orientation=:horizontal)
+    Legend(total_flux_fig[2,1], total_flux_ax, orientation=:horizontal, fontsize=16)
+    Legend(comp_flux_fig[2,1], comp_flux_ax, orientation=:horizontal, fontsize=16)
 
     save(@sprintf("images/%s_flux_total.png", tag), total_flux_fig)
     save(@sprintf("images/%s_flux_components.png", tag), comp_flux_fig)
+    
+    save(@sprintf("images/%s_flux_total.eps", tag), total_flux_fig)
+    save(@sprintf("images/%s_flux_components.eps", tag), comp_flux_fig)
+
 end
 
 function plot_energetics(run_directory, data_file, grid, tag, fig_opts)
@@ -212,6 +253,9 @@ function plot_diagnostic_energetics(run_directory, data_file, grid, tag, fig_opt
             t_diag  = diagnostic_file["diagnostics/KE/t"]
             KE_diag = diagnostic_file["diagnostics/KE/data"]
             PE_diag = 0.5 * diagnostic_file["diagnostics/PE/data"]
+            if isfile(@sprintf("%s/.correct_e", run_directory))
+                PE_diag = 2 * PE_diag
+            end
             
             plot_time_series(E_time_series_ax,     t_diag/f, KE_diag + PE_diag; color=(:black,  0.5), diag_plot_opts...)
             plot_time_series(KE_PE_time_series_ax, t_diag/f, KE_diag;           color=(:maroon, 0.5), diag_plot_opts...)
@@ -249,29 +293,103 @@ function plot_diagnostic_energetics(run_directory, data_file, grid, tag, fig_opt
     save(@sprintf("images/%s_energy_KE_PE.png",   tag), KE_PE_time_series_figure)
     save(@sprintf("images/%s_energy_wave.png",  tag), wave_time_series_figure)
     save(@sprintf("images/%s_energy_geo.png",   tag), geo_time_series_figure)
+
+    save(@sprintf("images/%s_energy_total.eps", tag), E_time_series_figure)
+    save(@sprintf("images/%s_energy_KE_PE.eps",   tag), KE_PE_time_series_figure)
+    save(@sprintf("images/%s_energy_wave.eps",  tag), wave_time_series_figure)
+    save(@sprintf("images/%s_energy_geo.eps",   tag), geo_time_series_figure)
+
+end
+
+function compute_pv_from_snapshot(snapshot, grid, params)
+    return @views @. 1im * grid.kr * snapshot[:,:,2] - 1im * grid.l * snapshot[:,:,1] - params.f * snapshot[:,:,3]
+end
+
+function compute_div_from_snapshot(snapshot, grid, params)
+    return @views @. 1im * grid.kr * snapshot[:,:,1] + 1im * grid.l * snapshot[:,:,2]
+end
+
+function plot_snapshots(run_directory, data_file, grid, tag, fig_opts)
+    Nsnapshots = count_key_snapshots(run_directory, "rsw")
+
+    start_t, start_rsw = load_key_snapshot(run_directory, "rsw", 2)
+    fin_t, fin_rsw = load_key_snapshot(run_directory, "rsw", Nsnapshots)
+    
+    dealias!(start_rsw, grid)
+    dealias!(fin_rsw, grid)
+
+    f, Cg2 = read_rsw_params(run_directory)
+    params = (; f, Cg2)
+    plot_snapshot(start_t, start_rsw, grid, params, "start", tag, fig_opts)
+    plot_snapshot(fin_t, fin_rsw, grid, params, "final", tag, fig_opts)
+end
+
+function plot_snapshot(time, snapshot, grid, params, title_tag, tag, fig_opts)
+    qh = compute_pv_from_snapshot(snapshot, grid, params)
+    divh = compute_div_from_snapshot(snapshot, grid, params)
+    
+    q = irfft(qh, grid.nx)
+    div = irfft(divh, grid.nx)
+
+    q_max = maximum(abs.(q))
+    div_max = maximum(abs.(div))
+    
+    q_fig = Figure(; fig_opts...)
+    div_fig = Figure(; fig_opts...)
+
+    q_ax = Axis(q_fig[1,1]; title=@sprintf("PV field at t=%0.1f", time))
+    div_ax = Axis(div_fig[1,1]; title=@sprintf("divergence field at t=%0.1f", time))
+
+    q_hm = heatmap!(q_ax, grid.x, grid.y, q; colorrange=(-q_max, q_max), colormap=:balance, rasterize=4)
+    div_hm = heatmap!(div_ax, grid.x, grid.y, div; colorrange=(-div_max, div_max), colormap=:balance, rasterize=4)
+    
+    Colorbar(q_fig[1,2], q_hm)
+    Colorbar(div_fig[1,2], div_hm)
+    
+    save(@sprintf("images/%s_%s_pv_snapshot.png", tag, title_tag), q_fig)
+    save(@sprintf("images/%s_%s_divergence_snapshot.png", tag, title_tag), div_fig)
+    save(@sprintf("images/%s_%s_pv_snapshot.eps", tag, title_tag), q_fig)
+    save(@sprintf("images/%s_%s_divergence_snapshot.eps", tag, title_tag), div_fig)
+end
+
+function plot_radial_energies(ic_ax, av_ax, radii, weight_matrix, Kd, ic_Eg, ic_Ew, av_Eg, av_Ew, line_opts, geo_opts, wave_opts, total_opts)
+    plot_radial_data(av_ax, radii/Kd, weight_matrix, av_Eg; line_opts..., geo_opts...)
+    plot_radial_data(av_ax, radii/Kd, weight_matrix, av_Ew; line_opts..., wave_opts...)
+    plot_radial_data(av_ax, radii/Kd, weight_matrix, av_Eg + av_Ew; line_opts..., total_opts...)
+    plot_radial_power_law(av_ax, radii/Kd, weight_matrix, av_Ew, 20/Kd, -2.00, 10/Kd, 80/Kd; linestyle=:dash, color=:gray, label="-2 power law")
+    plot_radial_power_law(av_ax, radii/Kd, weight_matrix, av_Ew, 20/Kd, -3.00, 10/Kd, 80/Kd; linestyle=:dash, color=:black, label="-3 power law")
+
+    plot_radial_data(ic_ax, radii/Kd, weight_matrix, ic_Eg; line_opts..., geo_opts...)
+    plot_radial_data(ic_ax, radii/Kd, weight_matrix, ic_Ew; line_opts..., wave_opts...)
 end
 
 function plot_radial_energetics(run_directory, data_file, grid, tag, fig_opts)
     Nsnapshots = count_key_snapshots(run_directory, "rsw")
     
     _, ic_rsw = load_key_snapshot(run_directory, "rsw", 1)
-    _, fin_rsw = load_key_snapshot(run_directory, "rsw", Nsnapshots)
+    #_, fin_rsw = load_key_snapshot(run_directory, "rsw", Nsnapshots)
     
     dealias!(ic_rsw, grid)
+    #dealias!(fin_rsw, grid)
     
     f, Cg2 = read_rsw_params(run_directory)
     params = (; f, Cg2)
     Kd = f/sqrt(Cg2)
     bases = compute_balanced_wave_bases(grid, params)
     ((ic_KE, ic_PE, ic_KEg, ic_PEg, ic_KEw, ic_PEw, ic_Eg, ic_Ew, Z), _) = compute_energy(ic_rsw, bases, grid, params)
-    ((fin_KE, fin_PE, fin_KEg, fin_PEg, fin_KEw, fin_PEw, fin_Eg, fin_Ew, Z), _) = compute_energy(fin_rsw, bases, grid, params)
+    #((fin_KE, fin_PE, fin_KEg, fin_PEg, fin_KEw, fin_PEw, fin_Eg, fin_Ew, Z), _) = compute_energy(fin_rsw, bases, grid, params)
     
     radii, weight_matrix = create_radialspectrum_weights(grid, 3);
 
+    ave_ke_energy_fig = Figure(; fig_opts...)
+    ic_ke_energy_fig  = Figure(; fig_opts...)
+    # fin_ke_energy_fig = Figure(; fig_opts...)
     
-    ave_energy_fig = Figure(; fig_opts...)
-    ic_energy_fig  = Figure(; fig_opts...)
-    fin_energy_fig = Figure(; fig_opts...)
+    ave_pe_energy_fig = Figure(; fig_opts...)
+    ic_pe_energy_fig  = Figure(; fig_opts...)
+    
+    ave_e_energy_fig = Figure(; fig_opts...)
+    ic_e_energy_fig  = Figure(; fig_opts...)
 
     max_E = maximum(data_file["energy/series/KE/total"]) + maximum(data_file["energy/series/APE/total"])
 
@@ -287,43 +405,66 @@ function plot_radial_energetics(run_directory, data_file, grid, tag, fig_opts)
         yminorticks,
         yminorgridvisible=true,
         limits=((3 * radii[1]/Kd, radii[end]/Kd), (1e-8 * max_E, 10 * max_E)))
-    ave_energy_ax = Axis(ave_energy_fig[1,1]; title="Time-averaged radial Kinetic Energy", ax_opts...)
-     ic_energy_ax = Axis( ic_energy_fig[1,1]; title="Initial radial Kinetic Energy", ax_opts...)
-    fin_energy_ax = Axis(fin_energy_fig[1,1]; title="Final radial Kinetic Energy", ax_opts...)
+    
+    ave_ke_energy_ax = Axis(ave_ke_energy_fig[1,1]; title="Time-averaged radial Kinetic Energy", ax_opts...)
+     ic_ke_energy_ax = Axis( ic_ke_energy_fig[1,1]; title="Initial radial Kinetic Energy", ax_opts...)
+    
+    ave_pe_energy_ax = Axis(ave_pe_energy_fig[1,1]; title="Time-averaged radial Available Potential Energy", ax_opts...)
+     ic_pe_energy_ax = Axis( ic_pe_energy_fig[1,1]; title="Initial radial Available Potential Energy", ax_opts...)
+
+    ave_e_energy_ax = Axis(ave_e_energy_fig[1,1]; title="Time-averaged radial Energy", ax_opts...)
+     ic_e_energy_ax = Axis( ic_e_energy_fig[1,1]; title="Initial radial Energy", ax_opts...)
 
     Nsnapshots = length(data_file["energy/t"])
-    Eg = data_file["energy/E/geo"]    / Nsnapshots
-    Ew = data_file["energy/E/wave"]   / Nsnapshots
-    KEg = data_file["energy/KE/geo"]   / Nsnapshots
-    KEw = data_file["energy/KE/wave"]  / Nsnapshots
-    PEg = data_file["energy/APE/geo"]  / Nsnapshots
-    PEw = data_file["energy/APE/wave"] / Nsnapshots
+    Eg = data_file["energy/E/geo"]
+    Ew = data_file["energy/E/wave"]
+    KEg = data_file["energy/KE/geo"]
+    KEw = data_file["energy/KE/wave"]
+    PEg = data_file["energy/APE/geo"]
+    PEw = data_file["energy/APE/wave"]
 
-    geo_opts = (; color=:tomato, label="geo")
-    wave_opts = (; color=:steelblue, label="wave")
+    geo_opts = (; color=:red, label="geo")
+    wave_opts = (; color=:blue, label="wave")
     total_opts = (; color=:black, label="total")
     line_opts = (; linewidth=2)
-    
-    plot_radial_data(ave_energy_ax, radii/Kd, weight_matrix, KEg; line_opts..., geo_opts...)
-    plot_radial_data(ave_energy_ax, radii/Kd, weight_matrix, KEw; line_opts..., wave_opts...)
-    plot_radial_data(ave_energy_ax, radii/Kd, weight_matrix, KEw + KEg + PEg + PEw; line_opts..., total_opts...)
-    plot_radial_power_law(ave_energy_ax, radii/Kd, weight_matrix, KEw, 20/Kd, -2.00, 10/Kd, 80/Kd; linestyle=:dash, color=:gray, label="-2 power law")
-    plot_radial_power_law(ave_energy_ax, radii/Kd, weight_matrix, KEw, 20/Kd, -3.00, 10/Kd, 80/Kd; linestyle=:dash, color=:black, label="-3 power law")
 
-    plot_radial_data(ic_energy_ax, radii/Kd, weight_matrix, ic_KEg; line_opts..., geo_opts...)
-    plot_radial_data(ic_energy_ax, radii/Kd, weight_matrix, ic_KEw; line_opts..., wave_opts...)
-    
-    plot_radial_data(fin_energy_ax, radii/Kd, weight_matrix, fin_KEg; line_opts..., geo_opts...)
-    plot_radial_data(fin_energy_ax, radii/Kd, weight_matrix, fin_KEw; line_opts..., wave_opts...)
-    plot_radial_data(fin_energy_ax, radii/Kd, weight_matrix, fin_KEw + fin_KEg + fin_PEg + fin_PEw; line_opts..., total_opts...)
-    plot_radial_power_law(fin_energy_ax, radii/Kd, weight_matrix, fin_KEw, 20/Kd, -2.00, 10/Kd, 80/Kd; linestyle=:dash, color=:gray, label="-2 power law")
-    plot_radial_power_law(fin_energy_ax, radii/Kd, weight_matrix, fin_KEw, 20/Kd, -3.00, 10/Kd, 80/Kd; linestyle=:dash, color=:black, label="-3 power law")
-    
-    Legend(ave_energy_fig[2, 1], ave_energy_ax, orientation=:horizontal)
-    Legend(ic_energy_fig[2, 1],  ic_energy_ax,  orientation=:horizontal)
-    Legend(fin_energy_fig[2, 1], fin_energy_ax,  orientation=:horizontal)
+    plot_radial_energies(ic_ke_energy_ax, ave_ke_energy_ax, radii, weight_matrix, Kd, ic_KEg, ic_KEw, KEg, KEw, line_opts, geo_opts, wave_opts, total_opts)
+    plot_radial_energies(ic_pe_energy_ax, ave_pe_energy_ax, radii, weight_matrix, Kd, ic_PEg, ic_PEw, PEg, PEw, line_opts, geo_opts, wave_opts, total_opts)
+    plot_radial_energies(ic_e_energy_ax, ave_e_energy_ax, radii, weight_matrix, Kd, ic_Eg, ic_Ew, Eg, Ew, line_opts, geo_opts, wave_opts, total_opts)
 
-    save(@sprintf("images/%s_energy_radial_average.png", tag), ave_energy_fig)
-    save(@sprintf("images/%s_energy_radial_initial.png", tag), ic_energy_fig)
-    save(@sprintf("images/%s_energy_radial_final.png", tag), fin_energy_fig)
+    k_max = grid.kr[end] * (1 - 1/3)
+    vline_opts = (; color=:gray, linewidth=1, label=rich("k", subscript("max, eff")))
+    vlines!(ic_ke_energy_ax,  [k_max/Kd]; vline_opts...)
+    vlines!(ave_ke_energy_ax, [k_max/Kd]; vline_opts...)
+    vlines!(ic_pe_energy_ax,  [k_max/Kd]; vline_opts...)
+    vlines!(ave_pe_energy_ax, [k_max/Kd]; vline_opts...)
+    vlines!(ic_e_energy_ax,   [k_max/Kd]; vline_opts...)
+    vlines!(ave_e_energy_ax,  [k_max/Kd]; vline_opts...)
+    
+    Legend(ave_ke_energy_fig[2, 1], ave_ke_energy_ax, orientation=:horizontal, fontsize=16)
+    Legend(ic_ke_energy_fig[2, 1],  ic_ke_energy_ax,  orientation=:horizontal, fontsize=16)
+
+    Legend(ave_pe_energy_fig[2, 1], ave_pe_energy_ax, orientation=:horizontal, fontsize=16)
+    Legend(ic_pe_energy_fig[2, 1],  ic_pe_energy_ax,  orientation=:horizontal, fontsize=16)
+
+    Legend(ave_e_energy_fig[2, 1], ave_e_energy_ax, orientation=:horizontal, fontsize=16)
+    Legend(ic_e_energy_fig[2, 1],  ic_e_energy_ax,  orientation=:horizontal, fontsize=16)
+
+    save(@sprintf("images/%s_kinetic_energy_radial_average.png", tag), ave_ke_energy_fig)
+    save(@sprintf("images/%s_kinetic_energy_radial_initial.png", tag), ic_ke_energy_fig)
+    # save(@sprintf("images/%s_energy_radial_final.png", tag), fin_ke_energy_fig)
+    save(@sprintf("images/%s_potential_energy_radial_average.png", tag), ave_pe_energy_fig)
+    save(@sprintf("images/%s_potential_energy_radial_initial.png", tag), ic_pe_energy_fig)
+
+    save(@sprintf("images/%s_energy_radial_average.png", tag), ave_e_energy_fig)
+    save(@sprintf("images/%s_energy_radial_initial.png", tag), ic_e_energy_fig)
+
+    save(@sprintf("images/%s_kinetic_energy_radial_average.eps", tag), ave_ke_energy_fig)
+    save(@sprintf("images/%s_kinetic_energy_radial_initial.eps", tag), ic_ke_energy_fig)
+    # save(@sprintf("images/%s_energy_radial_final.png", tag), fin_ke_energy_fig)
+    save(@sprintf("images/%s_potential_energy_radial_average.eps", tag), ave_pe_energy_fig)
+    save(@sprintf("images/%s_potential_energy_radial_initial.eps", tag), ic_pe_energy_fig)
+
+    save(@sprintf("images/%s_energy_radial_average.eps", tag), ave_e_energy_fig)
+    save(@sprintf("images/%s_energy_radial_initial.eps", tag), ic_e_energy_fig)
 end
