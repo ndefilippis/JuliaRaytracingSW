@@ -9,19 +9,19 @@ module Parameters
     Cg = 1.0
 
     nν = 4
-    νtune  = 10.0
+    νtune  = 100.0
 
     # Time stepper parameters
-    cfltune = 0.1
+    cfltune = 0.01
     use_filter = (νtune == 0)
     filter_order = 8
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 1100.
-    T = 1150.
-    output_dt = 0.01
-    diag_dt = 0.01
+    spinup_T = 800.0
+    T = 850.0
+    output_dt = 0.02/f
+    diag_dt = 0.1
 
     max_writes = 100
     base_filename= "rsw"
@@ -30,7 +30,7 @@ module Parameters
     # Initial condition parameters
     random_initial_condition = true
     Kg = (10, 13)
-    ag = 0.75
+    ag = 0.5
 
     Kw = (0, 5)
     aw = 0.1

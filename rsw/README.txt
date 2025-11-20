@@ -1,1 +1,1 @@
-almost neglibible wave amplitude, seeing if wave spreads with some geostrophic component
+Running to analyze b parameter with 0.1 Froude number

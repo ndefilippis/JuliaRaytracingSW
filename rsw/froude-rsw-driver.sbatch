@@ -4,12 +4,12 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=6GB
-#SBATCH --time=1:59:00
+#SBATCH --time=1-12:59:00
 #SBATCH --job-name=rsw
 #SBATCH --gres=gpu:v100:1
 #SBATCH --mail-user=nad9961@nyu.edu
 #SBATCH --mail-type=BEGIN,FAIL
-#SBATCH --array=1-5
+#SBATCH --array=1-2
 #SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge

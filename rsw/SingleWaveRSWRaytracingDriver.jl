@@ -123,7 +123,7 @@ function add_wavepackets_to_solution(prob, x0, y0, k0_idx, l0_idx, sign)
     @devzeros dev Complex{T} (grid.nkr, grid.nl) uwh vwh ηwh
 
     for i=1:Parameters.Npackets
-        uwh_i, vwh_i, ηwh_i = create_single_wave_envelop(grid, x0[i], y0[i], k0_idx[i], l0_idx[i], 
+        CUDA.@allowscalar uwh_i, vwh_i, ηwh_i = create_single_wave_envelope(grid, x0[i], y0[i], k0_idx[i], l0_idx[i], 
             0, sign[i], Parameters.env_size, Parameters.aw_2, params)
         uwh += uwh_i
         vwh += vwh_i

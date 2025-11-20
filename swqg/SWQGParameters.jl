@@ -9,7 +9,7 @@ module Parameters
     Cg = 1.0
 
     nν = 4
-    νtune  = 1
+    νtune  = 10.0
 
     # Time stepper parameters
     cfltune = 0.1
@@ -18,15 +18,15 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 200.
-    T = 7800.
-    output_dt = 0.3/f
-    diag_dt = 0.05
+    spinup_T = 800.
+    T = 1000.
+    output_dt = 0.02/f
+    diag_dt = 0.05/f
 
     max_writes = 300
     base_filename= "qgsw"
 
     # Initial condition parameters
     Kg = (10, 13)
-    ag = 0.3
+    ag = 1.0
 end

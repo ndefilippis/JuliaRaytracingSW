@@ -4,6 +4,8 @@ export
   set_solution!,
   enforce_reality_condition!,
   updatevars!,
+  kinetic_energy,
+  potential_energy,
   energy,
   wave_balanced_decomposition
 
@@ -49,7 +51,7 @@ function Vars(grid)
   T = eltype(grid)
 
   @devzeros Dev T (grid.nx, grid.ny) u v η ζ
-  @devzeros Dev Complex{T} (grid.nkr, grid.nl) uh vh ηh ζh 
+  @devzeros Dev Complex{T} (grid.nkr, grid.nl) uh vh ηh ζh
 
   return Vars(u, v, η, ζ, uh, vh, ηh, ζh)
 end
@@ -82,7 +84,7 @@ function Problem(dev::Device = CPU();
     T = Float64,
     use_filter=false,
     stepper_kwargs...)
-   
+
     grid = TwoDGrid(dev; nx, Lx, ny, Ly, aliased_fraction, T)
     params = Params{T}(ν, nν, f, Cg^2)
     vars = calcF! == nothingfunction ? Vars(grid) : StochasticVars(grid)
@@ -110,7 +112,7 @@ function updatevars!(prob)
     ldiv!(vars.v, grid.rfftplan, deepcopy(vars.vh)) # use deepcopy() because irfft destroys its input
     ldiv!(vars.η, grid.rfftplan, deepcopy(vars.ηh)) # use deepcopy() because irfft destroys its input
     ldiv!(vars.ζ, grid.rfftplan, deepcopy(vars.ζh)) # use deepcopy() because irfft destroys its input
-    
+
     return nothing
 end
 
@@ -123,11 +125,11 @@ function enforce_reality_condition!(prob)
     @. vars.ηh = @view sol[:,:,3]
 
     updatevars!(prob)
-        
+
     mul!(vars.uh, grid.rfftplan, deepcopy(vars.u))
     mul!(vars.vh, grid.rfftplan, deepcopy(vars.v))
     mul!(vars.ηh, grid.rfftplan, deepcopy(vars.η))
-    
+
     return nothing
 end
 
@@ -138,15 +140,15 @@ end
 
 function calcN!(N, sol, t, clock, vars, params, grid)
     dealias!(sol, grid)
-    
+
     uhN = @view N[:,:,1]
     vhN = @view N[:,:,2]
     ηhN = @view N[:,:,3]
-    
+
     @. vars.uh = @view sol[:,:,1]
     @. vars.vh = @view sol[:,:,2]
     @. vars.ηh = @view sol[:,:,3]
-    
+
     # Calculate advective terms
     # Compute real-space u
     # Use ζ and ζh as temp variables
@@ -185,7 +187,7 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     # Compute v * uy and u * vx terms
     # First, need to compute uy and vx, using ζ and ζh as scratch variables
     # ===
-    
+
     # v * uy term
     vuy = vars.ζ
     vuyh  = vars.ζh
@@ -195,7 +197,7 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     mul!(vuyh, grid.rfftplan, vuy)   # Convert back to spectral space
     @. uhN += -vuyh
 
-    # u * v 
+    # u * v
     uvx = vars.ζ
     uvxh  = vars.ζh
     @. uvxh = 1im * grid.kr * vars.vh # Store vx
@@ -211,7 +213,7 @@ function calcN!(N, sol, t, clock, vars, params, grid)
     ηh = vars.ζh
     @. ηh = vars.ηh
     ldiv!(vars.η, grid.rfftplan, ηh)
-    
+
     Fh = vars.ζh
     F  = vars.ζ
     @. F = (1.5 - 0.5 / (1 + vars.η)^2)
@@ -249,9 +251,9 @@ addforcing!(N, sol, t, clock, vars::Vars, params, grid) = nothing
 
 function addforcing!(N, sol, t, clock, vars::StochasticVars, params, grid)
   params.calcF!(vars.Fh, sol, t, clock, vars, params, grid)
-  
+
   @. N += vars.Fh
-  
+
   return nothing
 end
 
@@ -291,7 +293,7 @@ end
 
 function populate_L!(L, grid, params, dev::GPU)
     D = @. - params.ν * grid.Krsq^(params.nν)
-    
+
     config_kernel = @cuda launch=false Lop_kernel(L, grid.kr, grid.l, grid.nkr, grid.nl, D, params.f, params.Cg2)
     max_threads = CUDA.maxthreads(config_kernel)
     thread_size = 2^(floor(Int, log2(max_threads)/2))
@@ -343,7 +345,7 @@ end
 @inline kinetic_energy(sol, vars, params, grid) = kinetic_energy(vars.uh, vars.vh, grid)
 
 function potential_energy(ηh, params, grid)
-  return params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
+  return 0.5 * params.Cg2 * parsevalsum2(ηh, grid) / (grid.Lx * grid.Ly)
 end
 
 @inline potential_energy(prob) = potential_energy(prob.sol, prob.vars, prob.params, prob.grid)

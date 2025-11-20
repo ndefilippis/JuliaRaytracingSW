@@ -18,9 +18,9 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 0.
-    T = 2000.
-    output_dt = 3.0/f
+    spinup_T = 1100.
+    T = 1150.
+    output_dt = 0.03/f
     diag_dt = 0.1
 
     max_writes = 100

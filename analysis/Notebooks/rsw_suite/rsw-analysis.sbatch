@@ -2,11 +2,11 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64GB
-#SBATCH --time=1-8:59:00
+#SBATCH --cpus-per-task=6
+#SBATCH --mem=12GB
+#SBATCH --time=5:59:00
 #SBATCH --job-name=rsw-plots
-#SBATCH --array=80-80
+#SBATCH --array=92-93
 #SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge
@@ -32,4 +32,3 @@ mkdir images
 julia -t $SLURM_CPUS_PER_TASK RSWAnalysisDriver.jl $directory $tag > run.log
 
 exit
-

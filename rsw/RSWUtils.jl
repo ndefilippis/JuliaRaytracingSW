@@ -29,7 +29,7 @@ function compute_balanced_wave_bases(grid, params)
     
     @. Φ₀[:,:,u_INDEX] = -1im * grid.l  * Cg / ω
     @. Φ₀[:,:,v_INDEX] =  1im * grid.kr * Cg / ω
-    @. Φ₀[:,:,η_INDEX] =  params.f / ω
+    @. Φ₀[:,:,η_INDEX] = -params.f / ω
     Φ₀[1,1,:] = device_array(grid.device)([0, 0, 1])
 
     @. Φ₊[:,:,u_INDEX] = @. (ω*grid.kr + 1im * params.f*grid.l ) * sqrt(grid.invKrsq/2)/ω

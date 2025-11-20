@@ -1,1 +1,1 @@
-Rerunnign with correct weights
+Lindborg model with geostrophic component

@@ -42,12 +42,15 @@ function read_frequency_file_to_radial_data(radii, k_max, weight_matrix, fft_dir
         data_file = jldopen(filename)
         
         chosen_weights = [weights[k_idx, :] for weights=weight_matrix]
-        C0slice = eachslice(abs2.(data_file["c0t"]), dims=1)
-        Cpslice = eachslice(abs2.(data_file["c+t"]), dims=1)
-        Cnslice = eachslice(abs2.(data_file["c-t"]), dims=1)
+        #C0slice = eachslice(abs2.(data_file["c0t"]), dims=1)
+        #Cpslice = eachslice(abs2.(data_file["c+t"]), dims=1)
+        #Cnslice = eachslice(abs2.(data_file["c-t"]), dims=1)
+        C0slice = eachslice(abs2.(data_file["ugt"]) + abs2.(data_file["vgt"]) + abs2.(data_file["ηgt"]), dims=1)
+        Cpslice = eachslice(abs2.(data_file["uwt"]) + abs2.(data_file["vwt"]) + abs2.(data_file["ηwt"]), dims=1)
+        Cnslice = eachslice(abs2.(data_file["uwt"]) + abs2.(data_file["vwt"]) + abs2.(data_file["ηwt"]), dims=1)
         C0_data += chosen_weights' .* C0slice
-        Cp_data += chosen_weights' .* Cpslice
-        Cn_data += chosen_weights' .* Cnslice
+        Cp_data += 0.5*chosen_weights' .* Cpslice
+        Cn_data += 0.5*chosen_weights' .* Cnslice
     
         close(data_file)
         data_file = nothing

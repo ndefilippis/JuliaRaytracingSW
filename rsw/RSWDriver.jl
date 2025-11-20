@@ -35,6 +35,56 @@ function load_from_snapshot!(prob, initial_snapshot)
     RotatingShallowWater.set_solution!(prob, new_snapshot[:,:,1], new_snapshot[:,:,2], new_snapshot[:,:,3])
 end
 
+function set_front_initial_condition!(prob, Nwaves, aw, f0, Cg2)
+    grid = prob.grid
+    dev = typeof(grid.device)
+    T = typeof(grid.Lx)
+    Cg = sqrt(Cg2)
+    
+    @devzeros dev T (grid.nx, grid.ny) F new_x new_y
+    total = 0
+    
+    δ = grid.Lx/grid.nx
+    Ld = Cg/f0
+    
+    for i=1:Nwaves
+        θ = 2π*rand(Float32)
+        x0 = grid.Lx*rand(Float32) + grid.x[1]
+        y0 = grid.Ly*rand(Float32) + grid.y[1]
+    
+        @. new_x = (grid.x - x0)*cos(θ) - (grid.y - y0)'*sin(θ)
+        @. new_y = (grid.x - x0)*sin(θ) + (grid.y - y0)'*cos(θ)
+    
+        original_x =  new_x*cos(θ) + new_y*sin(θ)
+        original_y = -new_x*sin(θ) + new_y*cos(θ)
+        x_diff = @. mod(original_x - grid.x[1], grid.Lx) + grid.x[1]
+        y_diff = @. mod(original_y - grid.y[1], grid.Ly) + grid.y[1]
+        new_x_diff = @. x_diff*cos(θ) - y_diff*sin(θ)
+        new_y_diff = @. x_diff*sin(θ) + y_diff*cos(θ)
+        
+        exponent = @. -new_x_diff^2/(2δ^2) - new_y_diff^2/(2Ld^2)
+        envelope = @. -1/(δ*Ld)*exp(exponent/2)
+        env_total = sum(envelope)/grid.nx/grid.ny
+        @. F += envelope
+        total += env_total
+    end
+    F .-= total
+
+    Fh = rfft(F)
+    ω = @. sqrt(f0^2 + Cg^2*grid.Krsq)
+    ηwh = @. 1im * Cg / ω * Fh
+    uwh = @. 1im*Cg*(ω*grid.kr + 1im * f0 * grid.l ) * grid.invKrsq / ω * Fh
+    vwh = @. 1im*Cg*(ω*grid.l  - 1im * f0 * grid.kr) * grid.invKrsq / ω * Fh
+    uw = irfft(uwh, grid.nx)
+    vw = irfft(vwh, grid.nx)
+    Umax = maximum(sqrt.(uw.^2 + vw.^2))
+    
+    ηwh .*= aw / Umax
+    uwh .*= aw / Umax
+    vwh .*= aw / Umax
+    RotatingShallowWater.set_solution!(prob, uwh, vwh, ηwh)
+end
+
 function set_shafer_initial_condition!(prob, Kg, Kw, ag, aw, f, Cg2)
     grid = prob.grid
     dev = typeof(grid.device)
@@ -116,6 +166,8 @@ function initialize_problem()
 
     if Parameters.random_initial_condition
         set_shafer_initial_condition!(prob, Parameters.Kg, Parameters.Kw, Parameters.ag, Parameters.aw, params.f, params.Cg2)
+    elseif Parameters.front_initial_condition
+        set_front_initial_condition!(prob, Parameters.Nwaves, Parameters.aw, params.f, params.Cg2)
     else
         load_initial_condition_from_file!(prob, Parameters.snapshot_file, Parameters.snapshot_key)
     end
