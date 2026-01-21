@@ -4,5 +4,6 @@ slurm*.out
 *.pdf
 *.svg
 *.png
+*.eps
 *.jld2
 images/
