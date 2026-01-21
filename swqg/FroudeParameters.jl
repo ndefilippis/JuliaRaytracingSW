@@ -24,7 +24,7 @@ module Parameters
     T = parse(Float32, ARGS[4])
     spinup_T = T/5.0
 
-    output_dt = 1.0
+    output_dt = 10.0
     diag_dt = 0.5/f
 
     max_writes = 500
@@ -42,7 +42,7 @@ module Parameters
     use_stationary_background_flow = false
     write_gradients = true
     packet_max_writes = 300
-    packet_output_dt = 1.0;
+    packet_output_dt = 10.0;
 
     # Wavepackets parameters
     sqrtNpackets = 256; # Square root of the number of wavepackets;

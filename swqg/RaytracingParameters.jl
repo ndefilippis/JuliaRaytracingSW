@@ -9,7 +9,8 @@ module Parameters
     Cg = 1.0
 
     nν = 4
-    νtune  = 1
+    νtune  = 10
+    
 
     # Time stepper parameters
     cfltune = 0.1

@@ -18,9 +18,9 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 800.0
-    T = 850.0
-    output_dt = 0.02/f
+    spinup_T = 1500.0
+    T = 1550.0
+    output_dt = 0.2/f
     diag_dt = 0.1
 
     max_writes = 100
@@ -30,10 +30,10 @@ module Parameters
     # Initial condition parameters
     random_initial_condition = true
     Kg = (10, 13)
-    ag = 0.5
+    ag = 0.75
 
     Kw = (0, 5)
-    aw = 0.1
+    aw = 0.03
 
     # If no random initial condition, specify a snapshot file to load from
     snapshot_file = "/vast/nad9961/rsw/62221567/rsw.000000.jld2"

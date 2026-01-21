@@ -4,11 +4,11 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=16GB
-#SBATCH --time=4:59:59
+#SBATCH --time=1-5:59:59
 #SBATCH --job-name=rsw
 #SBATCH --gres=gpu:v100:1
 #SBATCH --mail-user=nad9961@nyu.edu
-#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=BEGIN,FAIL
 
 module purge
 

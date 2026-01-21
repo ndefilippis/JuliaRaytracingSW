@@ -1,1 +1,1 @@
-Running with differing background flows but scaling time with 1/Fr^2
+Running one low Froude and one high Froude run
