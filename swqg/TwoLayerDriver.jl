@@ -7,11 +7,11 @@ using LinearAlgebra: ldiv!
 
 import .Parameters
 
-function set_seed_initial_condtion(prob, grid, dev)
+function set_seed_initial_condition!(prob, grid, dev)
     q0 = 1e-2 * device_array(dev)(randn((grid.nx, grid.ny, 2)))
     q0h = rfft(q0, (1, 2))
 
-    TwoLayerQG.set_solution1(prob, q0h)
+    TwoLayerQG.set_solution!(prob, q0h)
 end
 
 function compute_parameters(deformation_radius, intervortex_radius, avg_eddy_velocity, H, f0)
@@ -27,7 +27,7 @@ function compute_parameters(deformation_radius, intervortex_radius, avg_eddy_vel
 end
 
 function initialize_problem()
-    dev = CPU()
+    dev = GPU()
     Lx=Parameters.L
     nx=Parameters.nx
     dx=Lx/nx
@@ -60,7 +60,7 @@ function initialize_problem()
     
     println(@sprintf("Total time: %f, Time step: %f, Estimated CFL: %0.3f", Parameters.T, dt, Parameters.cfltune))
     
-    prob = TwoLayerQG.Problem(dev; stepper="IFMAB3", Lx, nx, dt, f0=Parameters.f, Cg=Parameters.background_Cg, U, δρρ0, T=Float32, nν, ν, μ, aliased_fraction=Parameters.aliased_fraction use_filter=false)
+    prob = TwoLayerQG.Problem(dev; stepper="IFMAB3", Lx, nx, dt, f0=Parameters.f, Cg=Parameters.background_Cg, U, δρρ0, T=Float32, nν, ν, μ, aliased_fraction=Parameters.aliased_fraction, use_filter=false)
     
     set_seed_initial_condition!(prob, prob.grid, dev)
 

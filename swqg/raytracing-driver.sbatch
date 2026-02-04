@@ -5,7 +5,8 @@
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=24GB
 #SBATCH --time=12:00:00
-#SBATCH --gres=gpu:v100:1
+#SBATCH --gres=gpu:1
+#SBATCH --account=torch_pr_540_general
 #SBATCH --job-name=ray_qgsw
 
 module purge

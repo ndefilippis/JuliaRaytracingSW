@@ -17,9 +17,10 @@ module Parameters
     filter_order = 8
     aliased_fraction = 1/3
 
+    scale_factor = 0.5
     # Output and timing parameters
-    spinup_T = 800.
-    T = 2800.
+    spinup_T = scale_factor*800.
+    T = scale_factor*2800.
     output_dt = 0.2/f
     diag_dt = 0.5/f
 
@@ -28,5 +29,5 @@ module Parameters
 
     # Initial condition parameters
     Kg = (10, 13)
-    ag = 0.5
+    ag = scale_factor * 0.5
 end

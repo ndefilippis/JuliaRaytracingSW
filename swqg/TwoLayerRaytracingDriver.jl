@@ -57,7 +57,7 @@ function initialize_problem()
     Lx=Parameters.L
     nx=Parameters.nx
     dx=Lx/nx
-    kmax = nx/2 - 1
+    kmax = (nx/2 - 1) * Lx / (2π) * (1 - Parameters.aliased_fraction)
     nν=Parameters.nν
     νtune = Parameters.νtune
     H = 1.0
@@ -229,7 +229,7 @@ function start!()
     
     packet_l = @views packets[:, 4]
     
-	get_streamfunction(prob) = dropdims(sum(prob.vars.ψh, dims=3), dims=3) # Get barotropic streamfunction
+    get_streamfunction(prob) = @views 0.5 * (prob.vars.ψh[:,:,1] - prob.vars.ψh[:,:,2]) # Use baroclinic streamfunction
     
     get_velocity_info(get_streamfunction(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
 

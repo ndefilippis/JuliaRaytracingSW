@@ -6,7 +6,8 @@
 #SBATCH --mem=16GB
 #SBATCH --time=1-5:59:59
 #SBATCH --job-name=rsw
-#SBATCH --gres=gpu:v100:1
+#SBATCH --gres=gpu:l40s:1
+#SBATCH --account=torch_pr_540_general
 #SBATCH --mail-user=nad9961@nyu.edu
 #SBATCH --mail-type=BEGIN,FAIL
 
@@ -14,7 +15,7 @@ module purge
 
 export NUM_JULIA_THREADS=`nproc`
 
-rundir=$VAST/rsw/$SLURM_JOB_ID
+rundir=$SCRATCH/rsw/$SLURM_JOB_ID
 mkdir -p $rundir
 cp .correct_e rsw-driver.sbatch RotatingShallowWater.jl RSWDriver.jl RSWMain.jl README.txt $rundir
 cp ../utils/SequencedOutputs.jl ../utils/IFMAB3.jl $rundir

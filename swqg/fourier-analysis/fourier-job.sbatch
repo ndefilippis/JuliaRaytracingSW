@@ -5,6 +5,7 @@
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=64GB
 #SBATCH --time=01:30:00
+#SBATCH --account=torch_pr_540_general
 #SBATCH --job-name=rsw_f
 #SBATCH --array=1-64
 

@@ -24,16 +24,16 @@ filter_order = 8
 aliased_fraction = 1/3
 
 # Output and timing parameters
-spinup_T = 10000.
-T = 20000.
+spinup_T = 1000.
+T = 6000.
 output_dt = 3.0
 diag_dt = 0.5
 
-max_writes = 3000
+max_writes = 300
 base_filename = "2Lqg"
 
 # Initial condition parameters
-ug = 0.02
+ug = 0.1
 
 # Wavepackets output parameters
 packet_base_filename = "packets"

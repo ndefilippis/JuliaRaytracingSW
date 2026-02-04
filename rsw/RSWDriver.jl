@@ -203,7 +203,7 @@ function start!()
 
     starttime = time()
     for step=frames
-        if (step % 1000  == 0)
+        if (step % 100  == 0)
             max_udx = max(maximum(abs.(vars.u)) / grid.dx, maximum(abs.(vars.v)) / grid.dy)
             cfl = clock.dt * max_udx
             println(@sprintf("step: %04d, t: %.2f, cfl: %.2e, time: %.2f mins", clock.step, clock.t, cfl, (time() - starttime) / 60))

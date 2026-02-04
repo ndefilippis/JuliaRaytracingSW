@@ -1,1 +1,1 @@
-Running with no geostrophic component
+MRSW run

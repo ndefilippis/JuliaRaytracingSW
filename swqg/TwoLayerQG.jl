@@ -9,7 +9,6 @@ export
     potential_energy,
     enstrophy
 
-using Revise
 using FourierFlows
 using FourierFlows: parsevalsum2, parsevalsum, plan_flows_rfft
 using CUDA

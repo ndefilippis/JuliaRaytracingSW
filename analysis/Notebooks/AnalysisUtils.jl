@@ -45,6 +45,14 @@ function read_swqg_params(directory, key)
     return (; Kd2)
 end
 
+function read_2Lqg_params(directory, key)
+    file = jldopen(@sprintf("%s/%s.%06d.jld2", directory, key, 0))
+    F = file["params/F"]
+    U = file["params/U"]
+    close(file)
+    return (; F, U)
+end
+
 function read_rsw_params(directory)
     file = jldopen(@sprintf("%s/rsw.%06d.jld2", directory, 0))
     f = file["params/f"]

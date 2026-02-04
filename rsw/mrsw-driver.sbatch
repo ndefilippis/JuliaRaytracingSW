@@ -4,9 +4,10 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=6GB
-#SBATCH --time=5:59:59
+#SBATCH --time=1-5:59:59
 #SBATCH --job-name=mrsw
-#SBATCH --gres=gpu:v100:1
+#SBATCH --gres=gpu:l40s:1
+#SBATCH --account=torch_pr_540_general
 #SBATCH --mail-type=BEGIN,FAIL
 #SBATCH --mail-user=nad9961@nyu.edu
 
@@ -14,7 +15,7 @@ module purge
 
 export NUM_JULIA_THREADS=`nproc`
 
-rundir=$VAST/mrsw/$SLURM_JOB_ID
+rundir=$SCRATCH/mrsw/$SLURM_JOB_ID
 mkdir -p $rundir
 cp .correct_e mrsw-driver.sbatch RSWDriver.jl RSWMain.jl README.txt $rundir
 cp ModifiedShallowWater.jl $rundir/RotatingShallowWater.jl

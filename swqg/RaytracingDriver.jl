@@ -61,6 +61,11 @@ function generate_initial_wavepackets(dev, L, k0, Npackets, sqrtNpackets)
     phase = 2*pi*J/Npackets
     x .= repeat(diagonal, outer=sqrtNpackets)
     y .= repeat(diagonal, inner=sqrtNpackets)
+    
+    #k_diagonal = @. I * Parameters.k_cutoff/sqrtNpackets
+    #k .= repeat(k_diagonal, outer=sqrtNpackets)
+    #l .= repeat(k_diagonal, inner=sqrtNpackets)
+
     @. k = k0 * cos(phase)
     @. l = k0 * sin(phase)
     @devzeros typeof(dev) Float32 Npackets frequency_sign
@@ -98,7 +103,9 @@ function initialize_problem()
 
     println(@sprintf("Packets: %d. Output every %d steps. Total %d packet frames", Parameters.Npackets, packet_output_freq, (nsteps - spinup_step) / packet_output_freq))
     
-    prob = SWQG.Problem(dev; Lx, nx, dt, Parameters.f, Cg=Parameters.background_Cg, T=Float32, nν, ν, aliased_fraction=1/3, use_filter=false)
+    flush(stdout)
+
+    prob = SWQG.Problem(dev; Lx, nx, dt, Parameters.f, Cg=Parameters.Cg, T=Float32, nν, ν, aliased_fraction=1/3, use_filter=false)
     
     if(Parameters.use_snapshot_file)
         load_from_snapshot(prob, Parameters.snapshot_file, Parameters.snapshot_key)
@@ -188,7 +195,7 @@ function start!()
 
     # Create initial packets
     Npackets = Parameters.Npackets
-    k0 = sqrt(Parameters.ω0^2 - Parameters.f^2) / Parameters.background_Cg
+    k0 = sqrt(Parameters.ω0^2 - Parameters.f^2) / Parameters.Cg
     packets, freq_sign = generate_initial_wavepackets(device, Parameters.L, k0, Npackets, Parameters.sqrtNpackets)
     packet_params = (f = Parameters.f, Cg = Parameters.packet_Cg, dt = clock.dt, Npackets = Npackets, k0=k0, frequency_sign = freq_sign);
 
@@ -268,13 +275,13 @@ function start!()
             flush(stdout)
         end        
 
-		old_t = clock.t
+	old_t = clock.t
         if (clock.step < spinup_step)
             SWQG.stepforward!(prob, diags, packet_output_freq * output_per_packet_freq)
             SWQG.updatevars!(prob)
             get_velocity_info(get_streamfunction(prob), grid, packet_params, old_velocity, old_grad_v, temp_device_in_field, temp_device_out_field);
         else 
-    		for packet_step=packet_frames
+    	    for packet_step=packet_frames
                 if(Parameters.use_stationary_background_flow)
                     clock.step += 1
                     clock.t += clock.dt
