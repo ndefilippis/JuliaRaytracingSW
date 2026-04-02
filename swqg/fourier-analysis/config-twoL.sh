@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-analysis_directory=/scratch/nad9961/2Lqg/1518050/
+analysis_directory=/projects/rps/kss3/shaferlab/nick/2Lqg/1721374/4/
 max_K=256

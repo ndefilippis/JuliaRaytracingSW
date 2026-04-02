@@ -25,8 +25,8 @@ aliased_fraction = 1/3
 
 # Output and timing parameters
 spinup_T = 1000.
-T = 6000.
-output_dt = 3.0
+T = 1050.
+output_dt = 0.05
 diag_dt = 0.5
 
 max_writes = 300
@@ -40,7 +40,7 @@ packet_base_filename = "packets"
 use_stationary_background_flow = false
 write_gradients = true
 packet_max_writes = 5000
-packet_output_dt = 1.0;
+packet_output_dt = 0.05;
 
 # Wavepackets parameters
 sqrtNpackets = 512; # Square root of the number of wavepackets;

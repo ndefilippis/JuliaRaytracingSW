@@ -121,40 +121,56 @@ function write_fourier_data(directory, file_indices, k_idx)
             vh = @views snapshot[:,:,2]
             ηh = @views snapshot[:,:,3]
             (ugh, vgh, ηgh), (uwh, vwh, ηwh) = wave_balanced_decomposition(uh, vh, ηh, grid, params)
-            c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋, params)
 
-            ut[base_index+frame_idx,:] .= @views  uh[k_idx, :]
-            vt[base_index+frame_idx,:] .= @views  vh[k_idx, :]
-            ηt[base_index+frame_idx,:] .= @views  ηh[k_idx, :]
-            ug[base_index+frame_idx,:] .= @views ugh[k_idx, :]
-            vg[base_index+frame_idx,:] .= @views vgh[k_idx, :]
-            ηg[base_index+frame_idx,:] .= @views ηgh[k_idx, :]
-            uw[base_index+frame_idx,:] .= @views uwh[k_idx, :]
-            vw[base_index+frame_idx,:] .= @views vwh[k_idx, :]
-            ηw[base_index+frame_idx,:] .= @views ηwh[k_idx, :]
-            C₀[base_index+frame_idx,:] .= @views  c₀[k_idx, :]
-            C₊[base_index+frame_idx,:] .= @views  c₊[k_idx, :]
-            C₋[base_index+frame_idx,:] .= @views  c₋[k_idx, :]
+            #muh, mvh = compute_cubic_variables(uh, vh, ηh, grid)
+            mugh, mvgh = compute_cubic_variables(ugh, vgh, ηgh, grid)
+            muwh, mvwh = compute_cubic_variables(uwh, vwh, ηwh, grid)
+            #c₀, c₊, c₋ = compute_balanced_wave_weights(uh, vh, ηh, Φ₀, Φ₊, Φ₋, params)
+
+            #ut[base_index+frame_idx,:] .= @views  muh[k_idx, :]
+            #vt[base_index+frame_idx,:] .= @views  mvh[k_idx, :]
+            #ηt[base_index+frame_idx,:] .= @views   ηh[k_idx, :]
+            ug[base_index+frame_idx,:] .= @views mugh[k_idx, :]
+            vg[base_index+frame_idx,:] .= @views mvgh[k_idx, :]
+            ηg[base_index+frame_idx,:] .= @views  ηgh[k_idx, :]
+            uw[base_index+frame_idx,:] .= @views muwh[k_idx, :]
+            vw[base_index+frame_idx,:] .= @views mvwh[k_idx, :]
+            ηw[base_index+frame_idx,:] .= @views  ηwh[k_idx, :]
+            #C₀[base_index+frame_idx,:] .= @views  c₀[k_idx, :]
+            #C₊[base_index+frame_idx,:] .= @views  c₊[k_idx, :]
+            #C₋[base_index+frame_idx,:] .= @views  c₋[k_idx, :]
         end
         close(file)
         base_index += length(frames)
     end
     output_file["k"] = grid.kr[k_idx]
     output_file["t"] = t
-    output_file["ut"]  = clean_fft(t, ut, window)
-    output_file["vt"]  = clean_fft(t, vt, window)
-    output_file["ηt"]  = clean_fft(t, ηt, window)
+    #output_file["ut"]  = clean_fft(t, ut, window)
+    #output_file["vt"]  = clean_fft(t, vt, window)
+    #output_file["ηt"]  = clean_fft(t, ηt, window)
     output_file["ugt"] = clean_fft(t, ug, window)
     output_file["vgt"] = clean_fft(t, vg, window)
     output_file["ηgt"] = clean_fft(t, ηg, window)
     output_file["uwt"] = clean_fft(t, uw, window)
     output_file["vwt"] = clean_fft(t, vw, window)
     output_file["ηwt"] = clean_fft(t, ηw, window)
-    output_file["c0t"] = clean_fft(t, C₀, window)
-    output_file["c+t"] = clean_fft(t, C₊, window)
-    output_file["c-t"] = clean_fft(t, C₋, window)
+    #output_file["c0t"] = clean_fft(t, C₀, window)
+    #output_file["c+t"] = clean_fft(t, C₊, window)
+    #output_file["c-t"] = clean_fft(t, C₋, window)
     close(output_file)
     println("Done with k="*string(k_idx))
+end
+
+function compute_cubic_variables(uh, vh, ηh, grid)
+    u = irfft(uh, grid.nx)
+    v = irfft(vh, grid.nx)
+    η = irfft(ηh, grid.nx)
+    
+    mu = @. sqrt(1 + η) * u
+    mv = @. sqrt(1 + η) * v
+    muh = rfft(mu)
+    mvh = rfft(mv)
+    return muh, mvh
 end
 
 function start!()

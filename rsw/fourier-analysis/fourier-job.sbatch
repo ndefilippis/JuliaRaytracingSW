@@ -2,11 +2,13 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=12GB
 #SBATCH --time=04:30:00
+#SBATCH --account=torch_pr_540_general
 #SBATCH --job-name=rsw_f
-#SBATCH --array=1-129
+#SBATCH --array=1-86
+##SBATCH --output=./slurm-output/slurm-%A_%a.out
 
 module purge
 

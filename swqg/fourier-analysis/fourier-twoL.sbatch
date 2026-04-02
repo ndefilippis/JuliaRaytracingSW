@@ -2,11 +2,12 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=24
-#SBATCH --mem=64GB
-#SBATCH --time=01:30:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=24GB
+#SBATCH --time=00:10:00
 #SBATCH --account=torch_pr_540_general
 #SBATCH --job-name=2Lqg_f
+#SBATCH --output=./slurm-output/slurm-%A.out
 #SBATCH --array=1-64
 
 module purge
@@ -15,7 +16,7 @@ export NUM_JULIA_THREADS=`nproc`
 
 source config-twoL.sh
 
-rundir=$SCRATCH/2LQG_fourier/${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
+rundir=$SHAFERLAB/2LQG_fourier/${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}
 max_file=$(($(find $analysis_directory -name 2Lqg.[0-9]*.jld2 | wc -l)-1))
 job_size=$(($max_K/$SLURM_ARRAY_TASK_COUNT))
 

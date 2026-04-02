@@ -1,0 +1,12 @@
+ArrayID run_dir fourier_dir
+1 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/1/ /scratch/nad9961/2LQG_fourier/1626040/
+2 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/2/ /scratch/nad9961/2LQG_fourier/1626159/
+3 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/3/ /scratch/nad9961/2LQG_fourier/1626245/
+4 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/4/ /scratch/nad9961/2LQG_fourier/1626339/
+5 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/5/ /scratch/nad9961/2LQG_fourier/1626406/
+6 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/6/ /scratch/nad9961/2LQG_fourier/1626475/
+7 /projects/rps/kss3/shaferlab/nick/2Lqg/1622258/7/ /scratch/nad9961/2LQG_fourier/1626592/
+8 /projects/rps/kss3/shaferlab/nick/2Lqg/1721374/1/ /projects/rps/kss3/shaferlab/nick/2LQG_fourier/1849771/
+9 /projects/rps/kss3/shaferlab/nick/2Lqg/1721374/2/ /projects/rps/kss3/shaferlab/nick/2LQG_fourier/1849840/
+10 /projects/rps/kss3/shaferlab/nick/2Lqg/1721374/3/ /projects/rps/kss3/shaferlab/nick/2LQG_fourier/1849913/
+11 /projects/rps/kss3/shaferlab/nick/2Lqg/1721374/4/ /projects/rps/kss3/shaferlab/nick/2LQG_fourier/1850122/

@@ -9,7 +9,7 @@ module Parameters
     Cg = 1.0
 
     nν = 4
-    νtune  = 0.05
+    νtune  = 20.0
 
     # Time stepper parameters
     cfltune = 0.01
@@ -18,9 +18,9 @@ module Parameters
     aliased_fraction = 1/3
 
     # Output and timing parameters
-    spinup_T = 2000.0
-    T = 2050.0
-    output_dt = 1.0
+    spinup_T = 1200.0
+    T = 1300.0
+    output_dt = 0.025/f
     diag_dt = 0.5
 
     max_writes = 100
@@ -29,10 +29,10 @@ module Parameters
 
     # Initial condition parameters
     random_initial_condition = true
-    Kg = (6, 10)
-    ag = 0.05
+    Kg = (10, 13)
+    ag = 0.2
 
-	Kw = (0, 3)
+	Kw = (0, 5)
     aw = 0.1
 
     # If no random initial condition, specify a snapshot file to load from
